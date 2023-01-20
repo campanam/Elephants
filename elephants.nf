@@ -36,16 +36,15 @@ process buildMitoRef {
 	
 	input:
 	path mtDNA from params.mtDNA
-	val mtDNA_ID from params.mtDNA_ID
 	
 	output:
 	path "${mtDNA.baseName}.*" into ref_mtDNA_ch // Channel to find alignment files again
 	path "${mtDNA.baseName}*.{fai,dict}" into fai_mtDNA_laln_ch // Channel for fai file for LeftAlignIndels
 	
 	"""
-	${params.bin}bwa index ${mtDNA}
-	${params.bin}samtools faidx ${mtDNA}
-	${params.bin}samtools dict ${mtDNA} > ${mtDNA.baseName}.dict
+	bwa index ${mtDNA}
+	samtools faidx ${mtDNA}
+	samtools dict ${mtDNA} > ${mtDNA.baseName}.dict
 	"""
 
 }
@@ -191,66 +190,97 @@ process flagStats {
 	
 }
 
-
-
 sample_bam_ch = modern_bam_ch.groupTuple(by: 2) // Get a channel of unique samples matched with their file paths
 
 process mergeSampleBAM {
 
 	// Merge libraries by their sample IDs using SAMtools merge
 	
+	label 'grid_process'
+	
 	input:
-	tuple path(bam), val(species), val(sample) from sample_bam_ch
+	tuple path(bam), val(sample) from sample_bam_ch
 	
 	output:
-	file("*merged.bam") // There needs to be at least one output file, but either/both is ok
-	tuple file("${sample}_merged_vs_genome.merged.bam"), val(species_unique) optional true into merged_genome_bam_ch
-	tuple file("${sample}_merged_vs_mt.merged.bam"), val(species_unique) optional true into merged_mt_bam_ch
+	path "${sample}_merged*.bam" // Make sure there is some output
+	path "${sample}_merged*.merged.bam" optional true into merged_bam_ch // Send samples that need merging to merging processes
+	path "${sample}_merged_vs_genome.mrkdup.bam" optional true into final_bam_skip_ch // Skip unnecessary merging steps
+	path "${sample}_merged_vs_mt.mrkdup.bam" optional true into blast_bam_skip_ch // Skip unnecessary merging steps
 	
 	script:
+	samtools_extra_threads = task.cpus -1 
 	// First make sure that an input file exists for each type of alignment since could have been removed earlier. If no alignments exist, the whole sample should have been removed previously.
 	mtbamlist = ""
 	genomebamlist = ""
-	species_unique = species[0] // Remove redundant species designators from combining samples
+	mtbams = 0 // Count of mt bams
+	genomebams = 0 // Count of genome bams
 	for (i in bam) {
 		category = i.simpleName.split("_vs_")[1]
-		if (category == "mt")
+		if (category == "mt") {
+			mtbams++
 			mtbamlist = mtbamlist + " " + i
-		else
+		} else {
+			genomebams++
 			genomebamlist = genomebamlist + " " + i
+		}
 	}
-	if (mtbamlist != "" && genomebamlist == "")
+	if (genomebams == 0 && mtbams == 1)
 		"""
-		samtools merge -@ ${params.samtools_extra_threads} ${sample}_merged_vs_mt.merged.bam $mtbamlist
+		ln -s $mtbamlist ${sample}_merged_vs_mt.mrkdup.bam
 		"""
-	else if (genomebamlist != "" && mtbamlist == "")
+	 else if (genomebams == 0 && mtbams > 1)
+		"""
+		samtools merge -@ ${samtools_extra_threads} ${sample}_merged_vs_mt.merged.bam $mtbamlist
+		"""
+	else if (mtbams == 0 && genomebams == 1)
+		"""
+		ln -s $genomebamlist ${sample}_merged_vs_genome.mrkdup.bam
+		"""
+	else if (mtbams == 0 && genomebams > 1)
 		"""	
-		samtools merge -@ ${params.samtools_extra_threads} ${sample}_merged_vs_genome.merged.bam $genomebamlist
+		samtools merge -@ ${samtools_extra_threads} ${sample}_merged_vs_genome.merged.bam $genomebamlist
+		"""
+	else if (mtbams == 1 && genomebams > 1) 
+		"""
+		ln -s $mtbamlist ${sample}_merged_vs_mt.mrkdup.bam
+		samtools merge -@ ${samtools_extra_threads} ${sample}_merged_vs_genome.merged.bam $genomebamlist
+		"""
+	else if (mtbams > 1 && genomebams == 1)
+		"""
+		ln -s $genomebamlist ${sample}_merged_vs_genome.mrkdup.bam
+		samtools merge -@ ${samtools_extra_threads} ${sample}_merged_vs_mt.merged.bam $mtbamlist
+		"""
+	else if (mtbams == 1 && genomebams == 1)
+		"""
+		ln -s $mtbamlist ${sample}_merged_vs_mt.mrkdup.bam
+		ln -s $genomebamlist ${sample}_merged_vs_genome.mrkdup.bam
 		"""
 	else
 		"""
-		samtools merge -@ ${params.samtools_extra_threads} ${sample}_merged_vs_mt.merged.bam $mtbamlist
-		samtools merge -@ ${params.samtools_extra_threads} ${sample}_merged_vs_genome.merged.bam $genomebamlist
+		samtools merge -@ ${samtools_extra_threads} ${sample}_merged_vs_mt.merged.bam $mtbamlist
+		samtools merge -@ ${samtools_extra_threads} ${sample}_merged_vs_genome.merged.bam $genomebamlist
 		"""
-		
-}
+} 
 
-merged_bam_ch = merged_genome_bam_ch.mix(merged_mt_bam_ch)
+// Flatten array if both mt and genome samples need merging
+merged_bam_ch2 = merged_bam_ch.flatten()
+
 
 process mergedLeftAlignIndels {
 
 	// Left align indels for merged libraries
 	
+	label 'grid_process'
+	
 	input:
-	tuple path(mrgbam), val(species) from merged_bam_ch
-	val java_options from params.java_options
+	path mrgbam from merged_bam_ch2
 	path mtDNA from params.mtDNA
 	path mtDNA_fai from fai_mtDNA_laln_ch
 	path genome from params.refseq
 	path genome_fai from fai_refseq_laln_ch
 	
 	output:
-	tuple file("${mrgbam.simpleName}.laln.bam"), val(species) into laln_merged_bam_ch
+	file "${mrgbam.simpleName}.laln.bam" into laln_merged_bam_ch
 	
 	script:
 	 // Need to identify appropriate reference sequence for alignment
@@ -264,7 +294,7 @@ process mergedLeftAlignIndels {
 			break;
 	}
 	"""
-	java ${java_options} -jar ${params.bin}gatk.jar LeftAlignIndels -I ${mrgbam} -O ${mrgbam.simpleName}.laln.bam -R ${laln_reference}
+	$gatk LeftAlignIndels -I ${mrgbam} -O ${mrgbam.simpleName}.laln.bam -R ${laln_reference}
 	"""
 
 }
@@ -273,21 +303,21 @@ process mergedMarkDup {
 
 	// Mark duplicates for merged libraries after merging using Picard MarkDuplicates
 	
-	publishDir "$params.outdir/03_FinalBAMs", mode: 'copy'
+	label 'grid_process'
+	
+	publishDir "$params.outdir/05_FinalBAMs", mode: 'copy'
 	
 	input:
-	tuple path(laln_mrg_bam), val(species) from laln_merged_bam_ch
+	path laln_mrg_bam from laln_merged_bam_ch
 	val java_options from params.java_options
 	
 	output:
-	file("${laln_mrg_bam.simpleName}.mrkdup.bam") into mrg_mrkdup_bam_ch
-	tuple file("${laln_stem}_vs_genome.mrkdup.bam"), val(species) optional true into final_bam_ch
-	tuple file("${laln_stem}_vs_mt.mrkdup.bam"), val(species) optional true into final_mtbam_ch
+	path "${laln_mrg_bam.simpleName}.mrkdup.bam" into mrg_mrkdup_bam_ch
+	path "${laln_mrg_bam.simpleName.split('_vs_')[0]}_vs_mt.mrkdup.bam" optional true into blast_filter_ch
+	path "${laln_mrg_bam.simpleName.split('_vs_')[0]}_vs_genome.mrkdup.bam" optional true into final_bam_ch
 	
-	script:
-	laln_stem = laln_mrg_bam.simpleName.split('_vs_')[0]
 	"""
-	java ${java_options} -jar ${params.bin}picard.jar MarkDuplicates I=${laln_mrg_bam} O=${laln_mrg_bam.simpleName}.mrkdup.bam M=${laln_mrg_bam.simpleName}.mrkdup.txt
+	picard ${java_options} MarkDuplicates I=${laln_mrg_bam} O=${laln_mrg_bam.simpleName}.mrkdup.bam M=${laln_mrg_bam.simpleName}.mrkdup.txt
 	"""
 
 }
@@ -296,109 +326,26 @@ process mergedFlagStats {
 
 	// Calculate alignment statistics using SAMtools flagstat
 	
-	publishDir "$params.outdir/04_FinalFlagStats", mode: 'copy'
+	label 'grid_process'
+	
+	publishDir "$params.outdir/06_FinalFlagStats", mode: 'copy'
 	
 	input:
-	file(mrkdupbam) from mrg_mrkdup_bam_ch
-	val samtools_extra_threads from params.samtools_extra_threads
+	path mrkdupbam from mrg_mrkdup_bam_ch
 	
 	output:
-	file "${mrkdupbam.simpleName}.stats.txt"
+	path "${mrkdupbam.simpleName}.stats.txt"
 	
+	script:
+	samtools_extra_threads = task.cpus - 1
 	"""
-	${params.bin}samtools flagstat -@ ${samtools_extra_threads} ${mrkdupbam} > ${mrkdupbam.simpleName}.stats.txt
+	samtools flagstat -@ ${samtools_extra_threads} ${mrkdupbam} > ${mrkdupbam.simpleName}.stats.txt
 	"""
 
 }
 
-final_species_ch = final_bam_ch.unique().groupTuple(by: 1)
-final_mtspecies_ch = final_mtbam_ch.unique().groupTuple(by: 1)
+// Add different channels together
+final_bam_ch2 = final_bam_ch.mix(final_bam_skip_ch,blast_filter_ch,blast_bam_skip_ch)
 
 
 
-process jointcallVariants {
-
-	// Joint call genomic variants using BCFtools mpileup/call
-	
-	publishDir "$params.outdir/05_RawVCFs", mode: 'copy'
-	
-	input:
-	tuple path(final_bam), val(species) from final_species_ch
-	path genome from params.refseq
-	path genome_fai from fai_refseq_laln_ch
-	
-	output:
-	file "${species}_genomic_variants.raw.vcf.gz" into nuVar_ch
-	
-	"""
-	${params.bin}bcftools mpileup -a AD,DP -f $genome -q 20 -Q 20 *.bam | ${params.bin}bcftools call -m -v -Oz -o ${species}_genomic_variants.raw.vcf.gz
-	"""
-
-}
-
-process jointcallmtHaplotypes {
-
-	// Joint call mitogenomic haplotypes using BCFtools mpileup/call and vcf2aln
-	// Requires minimum allele depth of 3 to be included in alignment
-	
-	publishDir "$params.outdir/06_MtHaplotypes", mode: 'copy'
-	
-	input:
-	tuple path(final_bam), val(species) from final_mtspecies_ch
-	path mtDNA from params.mtDNA
-	path mtDNA_fai from fai_mtDNA_laln_ch
-	
-	output:
-	file "${species}_mt_*.fa.gz"
-	
-	"""
-	${params.bin}bcftools mpileup -a AD,DP -f $mtDNA -q 20 -Q 20 *.bam | ${params.bin}bcftools call --ploidy 1 -m -Ov | ${params.bin}vcf2aln.rb --pipe -A 3 -N -o ${species}_mt
-	gzip ${species}_mt_*.fa
-	"""
-
-}
-	
-process filternuVar {
-
-	// Filter nuclear variants using VCFtools
-	
-	publishDir "$params.outdir/07_FiltVCFs", mode: 'copy'
-	
-	input:
-	path raw_vcf from nuVar_ch
-	
-	output:
-	file "${raw_vcf.simpleName}.filt.recode.vcf.gz" into nuVar_filt_ch
-	file "${raw_vcf.simpleName}.filt.*"
-	
-	"""
-	${params.bin}vcftools --gzvcf $raw_vcf --out ${raw_vcf.simpleName}.filt --minDP 5 --max-missing 1 --min-alleles 2 --max-alleles 2 --maf 0.01 --remove-indels --recode
-	${params.bin}vcftools --vcf ${raw_vcf.simpleName}.filt.recode.vcf --het --out ${raw_vcf.simpleName}.filt
-	${params.bin}vcftools --vcf ${raw_vcf.simpleName}.filt.recode.vcf --depth --out ${raw_vcf.simpleName}.filt
-	gzip ${raw_vcf.simpleName}.filt.recode.vcf
-	"""
-
-}
-
-process mapfilternuVar {
-	
-	// Filter nuclear variants in regions of low mappability using BEDtools
-	
-	publishDir "$params.outdir/08_GenMapVCFs", mode: 'copy'
-	
-	input:
-	path filt_vcf from nuVar_filt_ch
-	path gm_bed from genmap_ch
-	
-	output:
-	file "${filt_vcf.simpleName}.gm.recode.vcf.gz" into nuVar_gm_ch
-	file "${filt_vcf.simpleName}.gm.*"
-	
-	"""
-	${params.bin}bedtools intersect -a $filt_vcf -b $gm_bed -v -header > ${filt_vcf.simpleName}.gm.recode.vcf
-	${params.bin}vcftools --vcf ${filt_vcf.simpleName}.gm.recode.vcf --het --out ${filt_vcf.simpleName}.gm
-	${params.bin}vcftools --vcf ${filt_vcf.simpleName}.gm.recode.vcf --depth --out ${filt_vcf.simpleName}.gm
-	gzip ${filt_vcf.simpleName}.gm.recode.vcf
-	"""
-	
-}
