@@ -196,8 +196,6 @@ process mergeSampleBAM {
 
 	// Merge libraries by their sample IDs using SAMtools merge
 	
-	label 'grid_process'
-	
 	input:
 	tuple path(bam), val(sample) from sample_bam_ch
 	
@@ -205,7 +203,7 @@ process mergeSampleBAM {
 	path "${sample}_merged*.bam" // Make sure there is some output
 	path "${sample}_merged*.merged.bam" optional true into merged_bam_ch // Send samples that need merging to merging processes
 	path "${sample}_merged_vs_genome.mrkdup.bam" optional true into final_bam_skip_ch // Skip unnecessary merging steps
-	path "${sample}_merged_vs_mt.mrkdup.bam" optional true into blast_bam_skip_ch // Skip unnecessary merging steps
+	path "${sample}_merged_vs_mt.mrkdup.bam" optional true into final_mt_skip_ch // Skip unnecessary merging steps
 	
 	script:
 	samtools_extra_threads = task.cpus -1 
@@ -270,8 +268,6 @@ process mergedLeftAlignIndels {
 
 	// Left align indels for merged libraries
 	
-	label 'grid_process'
-	
 	input:
 	path mrgbam from merged_bam_ch2
 	path mtDNA from params.mtDNA
@@ -305,7 +301,7 @@ process mergedMarkDup {
 	
 	label 'grid_process'
 	
-	publishDir "$params.outdir/05_FinalBAMs", mode: 'copy'
+	publishDir "$params.outdir/03_FinalBAMs", mode: 'copy'
 	
 	input:
 	path laln_mrg_bam from laln_merged_bam_ch
@@ -313,7 +309,7 @@ process mergedMarkDup {
 	
 	output:
 	path "${laln_mrg_bam.simpleName}.mrkdup.bam" into mrg_mrkdup_bam_ch
-	path "${laln_mrg_bam.simpleName.split('_vs_')[0]}_vs_mt.mrkdup.bam" optional true into blast_filter_ch
+	path "${laln_mrg_bam.simpleName.split('_vs_')[0]}_vs_mt.mrkdup.bam" optional true into final_mt_ch
 	path "${laln_mrg_bam.simpleName.split('_vs_')[0]}_vs_genome.mrkdup.bam" optional true into final_bam_ch
 	
 	"""
@@ -326,9 +322,7 @@ process mergedFlagStats {
 
 	// Calculate alignment statistics using SAMtools flagstat
 	
-	label 'grid_process'
-	
-	publishDir "$params.outdir/06_FinalFlagStats", mode: 'copy'
+	publishDir "$params.outdir/04_FinalFlagStats", mode: 'copy'
 	
 	input:
 	path mrkdupbam from mrg_mrkdup_bam_ch
@@ -345,7 +339,52 @@ process mergedFlagStats {
 }
 
 // Add different channels together
-final_bam_ch2 = final_bam_ch.mix(final_bam_skip_ch,blast_filter_ch,blast_bam_skip_ch)
+final_mt_ch2 = final_mt_ch.mix(final_mt_skip_ch)
+final_bam_ch2 = final_bam_ch.mix(final_bam_skip_ch)
 
 
+process callMtVariants {
 
+	// Call mtDNA variants using GATK HaplotypeCaller
+	
+	publishDir "$params.outdir/05_IndividualgVCFs/mt", mode: 'copy'
+	
+	input:
+	path final_bam from final_mt_ch2.unique()
+	path mtDNA from params.mtDNA
+	path mtDNA_fai from fai_mtDNA_laln_ch
+	
+	output:
+	path "${final_bam.simpleName}.vcf.gz" into gVCF_mt_ch
+	path "${final_bam.simpleName}.vcf.gz.tbi" into gVCF_mt_index_ch
+	
+	"""
+	samtools index $final_bam
+	$gatk HaplotypeCaller -R ${mtDNA} -ploidy 1 -I $final_bam -O ${final_bam.simpleName}.vcf.gz -ERC GVCF -G StandardAnnotation -G AS_StandardAnnotation
+	"""
+
+}
+
+process callGenomeVariants {
+
+	// Call nuclear genome variants using GATK HaplotypeCaller
+	
+	errorStrategy { task.attempt < task.maxRetries ? 'retry' : 'finish' }
+	
+	publishDir "$params.outdir/05_IndividualgVCFs/genome", mode: 'copy'
+	
+	input:
+	path final_bam from final_bam_ch2.unique()
+	path genome from params.refseq
+	path genome_fai from fai_refseq_laln_ch
+	
+	output:
+	path "${final_bam.simpleName}.vcf.gz" into gVCF_genome_ch
+	path "${final_bam.simpleName}.vcf.gz.tbi" into gVCF_genome_index_ch
+	
+	"""
+	samtools index $final_bam
+	$gatk HaplotypeCaller -R ${genome} -I $final_bam -O ${final_bam.simpleName}.vcf.gz -ERC GVCF -G StandardAnnotation -G AS_StandardAnnotation
+	"""
+
+}
