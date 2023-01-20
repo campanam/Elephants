@@ -1,9 +1,14 @@
 #!/usr/bin/env nextflow
 
+// Forked from Kauai pipeline on 20 Jan 2023
+// Optimizations taken from Drep_Phylogenomics pipeline dated 20 Jan 2023
+
+gatk = 'gatk --java-options "' + params.java_options + '" ' // Simplify gatk command line
+
 Channel
 	.fromPath(params.samples)
 	.splitCsv(header:true)
-	.map { row -> tuple(row.Sample, row.Species, row.Library, file(params.reads + row.Read1), file(params.reads + row.Read2), '@RG\\tID:' + row.Library + '\\tSM:' + row.Sample + '\\tLB:ILLUMINA\\tPL:ILLUMINA',row.Adapter1, row.Adapter2) }
+	.map { row -> tuple(row.Sample, row.Library, file(params.reads + row.Read1), file(params.reads + row.Read2), '@RG\\tID:' + row.Library + '\\tSM:' + row.Sample + '\\tLB:ILLUMINA\\tPL:ILLUMINA',row.Adapter1, row.Adapter2) }
 	.set { readpairs_ch }
 
 process buildRef {
@@ -14,56 +19,15 @@ process buildRef {
 	path refseq from params.refseq
 	
 	output:
-	file "${refseq.baseName}.*" into ref_build_ch // Channel to find these files again
-	file "${refseq.baseName}*.{fai,dict}" into fai_refseq_laln_ch // Channel for fai file for LeftAlignIndels
+	path "${refseq.baseName}.*" into ref_build_ch // Channel to find these files again
+	path "${refseq.baseName}*.{fai,dict}" into fai_refseq_laln_ch // Channel for fai file for LeftAlignIndels
 
 	"""
-	${params.bin}bwa index ${refseq}
-	${params.bin}samtools faidx ${refseq}
-	${params.bin}samtools dict ${refseq} > ${refseq.baseName}.dict
+	bwa index ${refseq}
+	samtools faidx ${refseq}
+	samtools dict ${refseq} > ${refseq.baseName}.dict
 	"""
 
-}
-
-// genMapIndex and genMapMap are from RatesTools 0.2 (Campana & Armstrong 2020)
-
-process genMapIndex {
-
-	// Generate GenMap index
-	
-	input:
-	path refseq from params.refseq
-	val gm_tmpdir from params.gm_tmpdir
-	
-	output:
-	path "${refseq.simpleName}_index" into genmap_index_ch
-	file "${refseq.simpleName}_index/*" into genmap_index_files_ch
-	
-	"""
-	export TMPDIR=${gm_tmpdir}
-	if [ ! -d ${gm_tmpdir} ]; then mkdir ${gm_tmpdir}; fi
-	${params.bin}genmap index -F ${refseq} -I ${refseq.simpleName}_index
-	"""
-
-}
-
-process genMapMap {
-
-	// Calculate mappability using GenMap and filter using filterGM
-	
-	input:
-	path refseq from params.refseq
-	val gm_threads from params.gm_threads
-	path genmap_index from genmap_index_ch
-	file '*' from genmap_index_files_ch
-	
-	output:
-	file "${refseq.simpleName}_genmap.1.0.bed" into genmap_ch
-	
-	"""
-	${params.bin}genmap map -K 30 -E 2 -T ${gm_threads} -I ${refseq.simpleName}_index/ -O ${refseq.simpleName}_genmap -b
-	${params.bin}filterGM.rb ${refseq.simpleName}_genmap.bed 1.0 exclude > ${refseq.simpleName}_genmap.1.0.bed
-	"""
 }
 
 process buildMitoRef {
@@ -75,8 +39,8 @@ process buildMitoRef {
 	val mtDNA_ID from params.mtDNA_ID
 	
 	output:
-	file "${mtDNA.baseName}.*" into ref_mtDNA_ch // Channel to find alignment files again
-	file "${mtDNA.baseName}*.{fai,dict}" into fai_mtDNA_laln_ch // Channel for fai file for LeftAlignIndels
+	path "${mtDNA.baseName}.*" into ref_mtDNA_ch // Channel to find alignment files again
+	path "${mtDNA.baseName}*.{fai,dict}" into fai_mtDNA_laln_ch // Channel for fai file for LeftAlignIndels
 	
 	"""
 	${params.bin}bwa index ${mtDNA}
@@ -91,13 +55,13 @@ process trimAdapters {
 	// Trim adapters using AdapterRemoval 2.3.1
 
 	input:
-	tuple val(sample), val(species), val(library), path(reads1), path(reads2), val(rg), val(adapter1), val(adapter2) from readpairs_ch
+	tuple val(sample), val(library), path(reads1), path(reads2), val(rg), val(adapter1), val(adapter2) from readpairs_ch
 	
 	output:
-	tuple val(library), file("${library}.R1.fastq.gz"), file("${library}.R2.fastq.gz"), val(sample), val(species), val(rg) into trim_readpairs_ch
+	tuple val(library), path("${library}.R1.fastq.gz"), path("${library}.R2.fastq.gz"), val(sample), val(rg) into trim_readpairs_ch
 	
 	"""
-	${params.bin}AdapterRemoval --file1 $reads1 --file2 $reads2 --basename $library --adapter1 $adapter1 --adapter2 $adapter2 --gzip --minlength 30
+	AdapterRemoval --file1 $reads1 --file2 $reads2 --basename $library --adapter1 $adapter1 --adapter2 $adapter2 --gzip --minlength 30
 	mv ${library}.pair1.truncated.gz ${library}.R1.fastq.gz
 	mv ${library}.pair2.truncated.gz ${library}.R2.fastq.gz
 	"""
@@ -110,22 +74,21 @@ process alignSeqs {
 	
 	input:
 	path refseq from params.refseq
-	file "*" from ref_build_ch
-	tuple val(library), path(reads1), path(reads2), val(sample), val(species), val(rg) from trim_readpairs_ch
-	val bwa_threads from params.bwa_threads
-	val samtools_extra_threads from params.samtools_extra_threads
+	path "*" from ref_build_ch
+	tuple val(library), path(reads1), path(reads2), val(sample), val(rg) from trim_readpairs_ch
 	
 	output:
-	tuple file("${library}_vs_genome.bam"), val(sample), val(species), val(rg) into raw_bam_ch
-	val samtools_extra_threads into samtools_threads_ch
-	tuple val(library), file("${library}.1.unmapped.fastq.gz"), file("${library}.2.unmapped.fastq.gz"), val(sample), val(species), val(rg) into mtDNA_fastq_ch
+	tuple file("${library}_vs_genome.bam"), val(sample) into raw_bam_ch
+	tuple val(library), file("${library}.1.unmapped.fastq.gz"), file("${library}.2.unmapped.fastq.gz"), val(sample), val(rg) into mtDNA_fastq_ch
 
+	script:
+	samtools_extra_threads = task.cpus - 1
 	"""
-	${params.bin}bwa mem -t ${bwa_threads} ${refseq} ${reads1} ${reads2} | ${params.bin}samtools view -@ ${samtools_extra_threads} -b -o ${library}.bam -
-	${params.bin}samtools view -@ ${samtools_extra_threads} -b -F 4 -o ${library}_vs_genome.bam ${library}.bam
-	${params.bin}samtools view -@ ${samtools_extra_threads} -b -f 4 ${library}.bam | samtools sort -@ ${samtools_extra_threads} -o ${library}.unmapped.bam -
-	${params.bin}samtools collate -@ ${samtools_extra_threads} -u -O ${library}.unmapped.bam | \\
-	${params.bin}samtools fastq -@ ${samtools_extra_threads} -1 ${library}.1.unmapped.fastq -2 ${library}.2.unmapped.fastq -0 /dev/null -s /dev/null
+	bwa mem -t ${task.cpus} -R ${rg} ${refseq} ${reads1} ${reads2} | samtools view -@ ${samtools_extra_threads} -b -o ${library}.bam -
+	samtools view -@ ${samtools_extra_threads} -b -F 4 ${library}.bam - | samtools fixmate -@ ${samtools_extra_threads} -r -m - - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_genome.bam -
+	samtools view -@ ${samtools_extra_threads} -b -f 4 ${library}.bam | samtools sort -@ ${samtools_extra_threads} -o ${library}.unmapped.bam -
+	samtools collate -@ ${samtools_extra_threads} -u -O ${library}.unmapped.bam | \\
+	samtools fastq -@ ${samtools_extra_threads} -1 ${library}.1.unmapped.fastq -2 ${library}.2.unmapped.fastq -0 /dev/null -s /dev/null
 	gzip ${library}.*.unmapped.fastq
 	"""
 	
@@ -139,87 +102,32 @@ process alignMitoSeqs {
 	tuple val(library), path(mtfastq1), path(mtfastq2), val(sample), val(species), val(rg) from mtDNA_fastq_ch
 	file "*" from ref_mtDNA_ch
 	path mtDNA from params.mtDNA
-	val bwa_threads from params.bwa_threads
-	val samtools_extra_threads from params.samtools_extra_threads
 	
 	output:
-	tuple file("${library}_vs_mt.bam"), val(sample), val(species), val(rg) into raw_mito_bam_ch
+	tuple path("${library}_vs_mt.bam"), val(sample) into raw_mito_bam_ch
 	
+	script:
+	samtools_extra_threads = task.cpus - 1
 	"""
-	${params.bin}bwa mem -t ${bwa_threads} ${mtDNA} ${mtfastq1} ${mtfastq2} | ${params.bin}samtools view -@ ${samtools_extra_threads} -b -o ${library}.bam -
-	${params.bin}samtools view -@ ${samtools_extra_threads} -b -F 4 -o ${library}_vs_mt.bam ${library}.bam
+	bwa mem -t ${task.cpus} -R ${rg} ${mtDNA} ${mtfastq1} ${mtfastq2} | samtools view -@ ${samtools_extra_threads} -b -F 4 - | amtools fixmate -@ ${samtools_extra_threads} -r -m - - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_mt.bam ${library}.bam -
 	"""
 }
 
 raw_bam_ch2 = raw_bam_ch.mix(raw_mito_bam_ch)
-
-process fixMate {
-
-	// Fix mate pairs using SAMtools fixmate
-	// Remove improperly paired and aligned reads afterwards using SAMtools view
-	
-	input:
-	tuple path(rawbam), val(sample), val(species), val(rg) from raw_bam_ch2
-	val samtools_extra_threads from params.samtools_extra_threads
-	
-	output:
-	tuple file("${rawbam.simpleName}.fix.bam"), val(sample), val(species), val(rg) into fix_bam_ch
-	
-	"""
-	${params.bin}samtools fixmate -@ ${samtools_extra_threads} -r -m ${rawbam} ${rawbam.simpleName}.tmp.bam
-	${params.bin}samtools view -@ ${samtools_extra_threads} -f 2 -o ${rawbam.simpleName}.fix.bam ${rawbam.simpleName}.tmp.bam
-	"""
-
-}
-
-process sortBAM {
-
-	// Sort BAM by coordinate using SAMtools sort
-	
-	input:
-	tuple path(fixbam), val(sample), val(species), val(rg) from fix_bam_ch
-	val samtools_extra_threads from params.samtools_extra_threads
-	
-	output:
-	tuple file("${fixbam.simpleName}.srt.bam"), val(sample), val(species), val(rg) into srt_bam_ch
-	
-	"""
-	${params.bin}samtools sort -@ ${samtools_extra_threads} -o ${fixbam.simpleName}.srt.bam ${fixbam}
-	"""
-
-}
-
-process addReadGroups {
-
-	// Add Read Group tags using samtools addreplacerg
-	
-	input:
-	tuple path(srtbam), val(sample), val(species), val(rg) from srt_bam_ch
-	val samtools_extra_threads from params.samtools_extra_threads
-	
-	output:
-	tuple file("${srtbam.simpleName}.rg.bam"), val(sample), val(species) into rg_bam_ch
-
-	"""
-	${params.bin}samtools addreplacerg -@ ${samtools_extra_threads} -r "$rg" -o ${srtbam.simpleName}.rg.bam ${srtbam}
-	"""
-
-}
 
 process leftAlignIndels {
 
 	// Left Align Indels using GATK4 LeftAlignIndels
 	
 	input:
-	tuple path(rgbam), val(sample), val(species) from rg_bam_ch
-	val java_options from params.java_options
+	tuple path(rgbam), val(sample) from raw_bam_ch2
 	path mtDNA from params.mtDNA
 	path mtDNA_fai from fai_mtDNA_laln_ch
 	path genome from params.refseq
 	path genome_fai from fai_refseq_laln_ch
 	
 	output:
-	tuple file("${rgbam.simpleName}.laln.bam"), val(sample), val(species) into laln_bam_ch
+	tuple path("${rgbam.simpleName}.laln.bam"), val(sample) into laln_bam_ch
 	
 	script:
 	 // Need to identify appropriate reference sequence for alignment
@@ -233,7 +141,7 @@ process leftAlignIndels {
 			break;
 	}
 	"""
-	java ${java_options} -jar ${params.bin}gatk.jar LeftAlignIndels -I ${rgbam} -O ${rgbam.simpleName}.laln.bam -R ${laln_reference}
+	$gatk LeftAlignIndels -I ${rgbam} -O ${rgbam.simpleName}.laln.bam -R ${laln_reference}
 	"""
 	
 }	
