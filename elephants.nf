@@ -8,7 +8,7 @@ gatk = 'gatk --java-options "' + params.java_options + '" ' // Simplify gatk com
 Channel
 	.fromPath(params.samples)
 	.splitCsv(header:true)
-	.map { row -> tuple(row.Sample, row.Library, file(params.reads + row.Read1), file(params.reads + row.Read2), '@RG\\tID:' + row.Library + '\\tSM:' + row.Sample + '\\tLB:ILLUMINA\\tPL:ILLUMINA',row.Adapter1, row.Adapter2) }
+	.map { row -> tuple(row.Sample, row.Library, file(params.reads + row.Read1), file(params.reads + row.Read2), '@RG\\tID:' + row.Library + '\\tSM:' + row.Sample + '\\tLB:ILLUMINA\\tPL:ILLUMINA') }
 	.set { readpairs_ch }
 
 process buildRef {
@@ -49,24 +49,6 @@ process buildMitoRef {
 
 }
 
-process trimAdapters {
-
-	// Trim adapters using AdapterRemoval 2.3.1
-
-	input:
-	tuple val(sample), val(library), path(reads1), path(reads2), val(rg), val(adapter1), val(adapter2) from readpairs_ch
-	
-	output:
-	tuple val(library), path("${library}.R1.fastq.gz"), path("${library}.R2.fastq.gz"), val(sample), val(rg) into trim_readpairs_ch
-	
-	"""
-	AdapterRemoval --file1 $reads1 --file2 $reads2 --basename $library --adapter1 $adapter1 --adapter2 $adapter2 --gzip --minlength 30
-	mv ${library}.pair1.truncated.gz ${library}.R1.fastq.gz
-	mv ${library}.pair2.truncated.gz ${library}.R2.fastq.gz
-	"""
-
-}
-
 process alignSeqs {
 
 	// Align sequences using BWA and convert unmapped reads to FASTQ for alignment to mtDNA
@@ -74,11 +56,11 @@ process alignSeqs {
 	input:
 	path refseq from params.refseq
 	path "*" from ref_build_ch
-	tuple val(library), path(reads1), path(reads2), val(sample), val(rg) from trim_readpairs_ch
+	tuple val(sample), val(library), path(reads1), path(reads2), val(rg) from readpairs_ch
 	
 	output:
 	tuple file("${library}_vs_genome.bam"), val(sample) into raw_bam_ch
-	tuple val(library), file("${library}.1.unmapped.fastq.gz"), file("${library}.2.unmapped.fastq.gz"), val(sample), val(rg) into mtDNA_fastq_ch
+	tuple val(library), path("${library}.1.unmapped.fastq.gz"), path("${library}.2.unmapped.fastq.gz"), val(sample), val(rg) into mtDNA_fastq_ch
 
 	script:
 	samtools_extra_threads = task.cpus - 1
