@@ -153,11 +153,11 @@ process markDup {
 	publishDir "$params.outdir/01_LibraryBAMs", mode: 'copy'
 	
 	input:
-	tuple path(lalnbam), val(sample), val(species) from laln_bam_ch
+	tuple path(lalnbam), val(sample) from laln_bam_ch
 	val java_options from params.java_options
 	
 	output:
-	tuple file("${lalnbam.simpleName}.mrkdup.bam"), val(sample), val(species) into mrkdup_bam_ch
+	tuple path("${lalnbam.simpleName}.mrkdup.bam"), val(sample) into mrkdup_bam_ch
 	
 	"""
 	java ${java_options} -jar ${params.bin}picard.jar MarkDuplicates I=${lalnbam} O=${lalnbam.simpleName}.mrkdup.bam M=${lalnbam.simpleName}.mrkdup.txt
@@ -172,58 +172,28 @@ process flagStats {
 	publishDir "$params.outdir/02_LibraryFlagStats", mode: 'copy', pattern: '*.stats.txt'
 	
 	input:
-	tuple path(mrkdupbam), val(sample), val(species) from mrkdup_bam_ch
+	tuple path(mrkdupbam), val(sample) from mrkdup_bam_ch
+	val(minmapped) from params.min_uniq_mapped
 	
 	output:
-	tuple file(mrkdupbam), file("${mrkdupbam.simpleName}.stats.txt"), val(sample), val(species) into flagstat_ch
+	path("${mrkdupbam.simpleName}.stats.txt")
+	tuple path("${mrkdupbam.simpleName}.trim.bam"), val(sample) optional true into modern_bam_ch
 	
+	script:
+	samtools_extra_threads = task.cpus - 1
 	"""
-	samtools flagstat -@ ${params.samtools_extra_threads} ${mrkdupbam} > ${mrkdupbam.simpleName}.stats.txt
+	samtools flagstat -@ ${samtools_extra_threads} ${mrkdupbam} > ${mrkdupbam.simpleName}.stats.txt
+	primary=`sed -n \'2p\' ${mrkdupbam.simpleName}.stats.txt | cut -f 1 -d \" \"` # Primary alignments
+	dup=`sed -n \'6p\' ${mrkdupbam.simpleName}.stats.txt | cut -f 1 -d \" \"` # Primary duplicates
+	let total=\$primary-\$dup
+	if [[ \$total -ge $minmapped ]]; then ln $mrkdupbam ${mrkdupbam.simpleName}.trim.bam; fi
 	"""
 	
 }
 
-process identifyLowCoverageBAMs {
 
-	// Remove BAM files with insufficient unique primary alignments
-	
-	input:
-	tuple path(mrkdupbam), path(flagstat), val(sample), val(species) from flagstat_ch
-	
-	output:
-	tuple (file(mrkdupbam), val(sample), val(species), stdout) into modern_bam_ch
-	
-	"""
-	# Calculate number of unique primary alignments
-	primary=`sed -n \'2p\' $flagstat | cut -f 1 -d \" \"` # Primary alignments
-	dup=`sed -n \'6p\' $flagstat | cut -f 1 -d \" \"` # Primary duplicates
-	let total=\$primary-\$dup+100 # Trying to get around 0 issue which causes it to think it's reporting an exit status
-	echo \$total
-	"""
 
-}
-
-process sortModern {
-
-	// Identify modern samples for merging downstream
-	// Probably a more elegant way to do this branch, but I have not figured it out
-	
-	input:
-	tuple path(mrkdupbam), val(sample), val(species), val(total) from modern_bam_ch
-
-	output:
-	tuple file("${mrkdupbam.simpleName}.trim.bam"), val(species), val(sample) into modern_bam_ch2
-	
-	when:
-	total as int >= params.min_uniq_mapped + 100
-	
-	"""
-	ln $mrkdupbam ${mrkdupbam.simpleName}.trim.bam # Calling these 'trimmed' for downstream simplicity
-	"""
-	
-}
-
-sample_bam_ch = modern_bam_ch2.groupTuple(by: 2) // Get a channel of unique samples matched with their file paths
+sample_bam_ch = modern_bam_ch.groupTuple(by: 2) // Get a channel of unique samples matched with their file paths
 
 process mergeSampleBAM {
 
