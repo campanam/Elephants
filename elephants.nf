@@ -66,7 +66,7 @@ process alignSeqs {
 	samtools_extra_threads = task.cpus - 1
 	"""
 	bwa mem -t ${task.cpus} -R '${rg}' ${refseq} ${reads1} ${reads2} | samtools view -@ ${samtools_extra_threads} -b -o ${library}.bam -
-	samtools view -@ ${samtools_extra_threads} -b -F 4 ${library}.bam - | samtools fixmate -@ ${samtools_extra_threads} -r -m - - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_genome.bam -
+	samtools view -@ ${samtools_extra_threads} -b -F 4 ${library}.bam | samtools fixmate -@ ${samtools_extra_threads} -r -m - - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_genome.bam -
 	samtools view -@ ${samtools_extra_threads} -b -f 4 ${library}.bam | samtools sort -@ ${samtools_extra_threads} -o ${library}.unmapped.bam -
 	samtools collate -@ ${samtools_extra_threads} -u -O ${library}.unmapped.bam | \\
 	samtools fastq -@ ${samtools_extra_threads} -1 ${library}.1.unmapped.fastq -2 ${library}.2.unmapped.fastq -0 /dev/null -s /dev/null
