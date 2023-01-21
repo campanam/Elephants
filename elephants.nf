@@ -53,8 +53,6 @@ process alignSeqs {
 
 	// Align sequences using BWA and convert unmapped reads to FASTQ for alignment to mtDNA
 	
-	errorStrategy { task.attempt < task.maxRetries ? 'retry' : 'finish' }
-	
 	input:
 	path refseq from params.refseq
 	path "*" from ref_build_ch
@@ -81,8 +79,6 @@ process alignMitoSeqs {
 
 	// Align mitochondrial sequences using BWA
 	
-	errorStrategy { task.attempt < task.maxRetries ? 'retry' : 'finish' }
-	
 	input:
 	tuple val(library), path(mtfastq1), path(mtfastq2), val(sample), val(rg) from mtDNA_fastq_ch
 	file "*" from ref_mtDNA_ch
@@ -103,8 +99,6 @@ raw_bam_ch2 = raw_bam_ch.mix(raw_mito_bam_ch)
 process leftAlignIndels {
 
 	// Left Align Indels using GATK4 LeftAlignIndels
-	
-	errorStrategy { task.attempt < task.maxRetries ? 'retry' : 'finish' }
 	
 	input:
 	tuple path(rgbam), val(sample) from raw_bam_ch2
@@ -139,8 +133,6 @@ process markDup {
 	
 	publishDir "$params.outdir/01_LibraryBAMs", mode: 'copy'
 	
-	errorStrategy { task.attempt < task.maxRetries ? 'retry' : 'finish' }
-	
 	input:
 	tuple path(lalnbam), val(sample) from laln_bam_ch
 	val java_options from params.java_options
@@ -159,8 +151,6 @@ process flagStats {
 	// Calculate alignment statistics for unmerged library files using SAMtools flagstat
 	
 	publishDir "$params.outdir/02_LibraryFlagStats", mode: 'copy', pattern: '*.stats.txt'
-	
-	errorStrategy { task.attempt < task.maxRetries ? 'retry' : 'finish' }
 	
 	input:
 	tuple path(mrkdupbam), val(sample) from mrkdup_bam_ch
@@ -187,8 +177,6 @@ sample_bam_ch = modern_bam_ch.groupTuple(by: 2) // Get a channel of unique sampl
 process mergeSampleBAM {
 
 	// Merge libraries by their sample IDs using SAMtools merge
-	
-	errorStrategy { task.attempt < task.maxRetries ? 'retry' : 'finish' }
 	
 	input:
 	tuple path(bam), val(sample) from sample_bam_ch
@@ -262,8 +250,6 @@ process mergedLeftAlignIndels {
 
 	// Left align indels for merged libraries
 	
-	errorStrategy { task.attempt < task.maxRetries ? 'retry' : 'finish' }
-	
 	input:
 	path mrgbam from merged_bam_ch2
 	path mtDNA from params.mtDNA
@@ -297,8 +283,6 @@ process mergedMarkDup {
 	
 	publishDir "$params.outdir/03_FinalBAMs", mode: 'copy'
 	
-	errorStrategy { task.attempt < task.maxRetries ? 'retry' : 'finish' }
-	
 	input:
 	path laln_mrg_bam from laln_merged_bam_ch
 	val java_options from params.java_options
@@ -319,8 +303,6 @@ process mergedFlagStats {
 	// Calculate alignment statistics using SAMtools flagstat
 	
 	publishDir "$params.outdir/04_FinalFlagStats", mode: 'copy'
-	
-	errorStrategy { task.attempt < task.maxRetries ? 'retry' : 'finish' }
 	
 	input:
 	path mrkdupbam from mrg_mrkdup_bam_ch
@@ -347,8 +329,6 @@ process callMtVariants {
 	
 	publishDir "$params.outdir/05_IndividualgVCFs/mt", mode: 'copy'
 	
-	errorStrategy { task.attempt < task.maxRetries ? 'retry' : 'finish' }
-	
 	input:
 	path final_bam from final_mt_ch2.unique()
 	path mtDNA from params.mtDNA
@@ -370,8 +350,6 @@ process callGenomeVariants {
 	// Call nuclear genome variants using GATK HaplotypeCaller
 	
 	publishDir "$params.outdir/05_IndividualgVCFs/genome", mode: 'copy'
-	
-	errorStrategy { task.attempt < task.maxRetries ? 'retry' : 'finish' }
 	
 	input:
 	path final_bam from final_bam_ch2.unique()
