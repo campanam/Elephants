@@ -80,7 +80,7 @@ process alignMitoSeqs {
 	// Align mitochondrial sequences using BWA
 	
 	input:
-	tuple val(library), path(mtfastq1), path(mtfastq2), val(sample), val(species), val(rg) from mtDNA_fastq_ch
+	tuple val(library), path(mtfastq1), path(mtfastq2), val(sample), val(rg) from mtDNA_fastq_ch
 	file "*" from ref_mtDNA_ch
 	path mtDNA from params.mtDNA
 	
@@ -350,8 +350,6 @@ process callMtVariants {
 process callGenomeVariants {
 
 	// Call nuclear genome variants using GATK HaplotypeCaller
-	
-	errorStrategy { task.attempt < task.maxRetries ? 'retry' : 'finish' }
 	
 	publishDir "$params.outdir/05_IndividualgVCFs/genome", mode: 'copy'
 	
