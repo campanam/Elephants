@@ -90,7 +90,7 @@ process alignMitoSeqs {
 	script:
 	samtools_extra_threads = task.cpus - 1
 	"""
-	bwa mem -t ${task.cpus} -R '${rg}' ${mtDNA} ${mtfastq1} ${mtfastq2} | samtools view -@ ${samtools_extra_threads} -b -F 4 - | amtools fixmate -@ ${samtools_extra_threads} -r -m - - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_mt.bam ${library}.bam -
+	bwa mem -t ${task.cpus} -R '${rg}' ${mtDNA} ${mtfastq1} ${mtfastq2} | samtools view -@ ${samtools_extra_threads} -b -F 4 - | samtools fixmate -@ ${samtools_extra_threads} -r -m - - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_mt.bam ${library}.bam -
 	"""
 }
 
