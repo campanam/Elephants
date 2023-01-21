@@ -149,7 +149,7 @@ process markDup {
 	tuple path("${lalnbam.simpleName}.mrkdup.bam"), val(sample) into mrkdup_bam_ch
 	
 	"""
-	java ${java_options} -jar ${params.bin}picard.jar MarkDuplicates I=${lalnbam} O=${lalnbam.simpleName}.mrkdup.bam M=${lalnbam.simpleName}.mrkdup.txt
+	java ${java_options} -jar picard.jar MarkDuplicates I=${lalnbam} O=${lalnbam.simpleName}.mrkdup.bam M=${lalnbam.simpleName}.mrkdup.txt
 	"""
 	
 }
