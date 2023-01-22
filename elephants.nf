@@ -140,8 +140,10 @@ process markDup {
 	output:
 	tuple path("${lalnbam.simpleName}.mrkdup.bam"), val(sample) into mrkdup_bam_ch
 	
+	script:
+	samtools_extra_threads = task.cpus - 1
 	"""
-	picard ${java_options} MarkDuplicates I=${lalnbam} O=${lalnbam.simpleName}.mrkdup.bam M=${lalnbam.simpleName}.mrkdup.txt
+	samtools markdup -@ ${samtools_extra_threads} ${lalnbam} ${lalnbam.simpleName}.mrkdup.bam
 	"""
 	
 }
@@ -292,8 +294,11 @@ process mergedMarkDup {
 	path "${laln_mrg_bam.simpleName.split('_vs_')[0]}_vs_mt.mrkdup.bam" optional true into final_mt_ch
 	path "${laln_mrg_bam.simpleName.split('_vs_')[0]}_vs_genome.mrkdup.bam" optional true into final_bam_ch
 	
+	
+	script:
+	samtools_extra_threads = task.cpus - 1
 	"""
-	picard ${java_options} MarkDuplicates I=${laln_mrg_bam} O=${laln_mrg_bam.simpleName}.mrkdup.bam M=${laln_mrg_bam.simpleName}.mrkdup.txt
+	samtools markdup -@ ${samtools_extra_threads} ${laln_mrg_bam} ${laln_mrg_bam.simpleName}.mrkdup.bam
 	"""
 
 }
