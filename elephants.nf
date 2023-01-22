@@ -174,7 +174,7 @@ process flagStats {
 	
 }
 
-sample_bam_ch = modern_bam_ch.groupTuple(by: 2) // Get a channel of unique samples matched with their file paths
+sample_bam_ch = modern_bam_ch.groupTuple(by: 1) // Get a channel of unique samples matched with their file paths
 
 process mergeSampleBAM {
 
