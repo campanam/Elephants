@@ -372,3 +372,17 @@ process callGenomeVariants {
 	"""
 
 }
+
+workflow.onComplete {
+	if (workflow.success) {
+		println "Elephant pipeline completed successfully at $workflow.complete!"
+		if (params.email != "NULL") {
+			sendMail(to: params.email, subject: 'Elephant pipeline successful completion', body: "Elephant pipeline completed successfully at $workflow.complete!")
+		}
+	} else {
+		println "Elephant pipeline terminated with errors at $workflow.complete.\nError message: $workflow.errorMessage"
+		if (params.email != "NULL") {
+			sendMail(to: params.email, subject: 'Elephant pipeline terminated with errors', body: "Elephant pipeline terminated with errors at $workflow.complete.\nError message: $workflow.errorMessage")
+		}
+	}
+}
