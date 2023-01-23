@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 
 // Forked from Kauai pipeline on 20 Jan 2023
-// Optimizations taken from Drep_Phylogenomics pipeline dated 20 Jan 2023
+// Optimizations taken from Drep_Phylogenomics and Rana_MHC pipeline dated 20 Jan 2023
 
 gatk = 'gatk --java-options "' + params.java_options + '" ' // Simplify gatk command line
 
