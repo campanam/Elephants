@@ -2,6 +2,7 @@
 
 // Forked from Kauai pipeline on 20 Jan 2023
 // Optimizations taken from Drep_Phylogenomics and Rana_MHC pipeline dated 20 Jan 2023
+// Email handling from RatesTools v 0.5.12
 
 gatk = 'gatk --java-options "' + params.java_options + '" ' // Simplify gatk command line
 
