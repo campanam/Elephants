@@ -1,8 +1,10 @@
 #!/usr/bin/env nextflow
 
-// Forked from Kauai pipeline on 20 Jan 2023
-// Optimizations taken from Drep_Phylogenomics and Rana_MHC pipeline dated 20 Jan 2023
-// Email handling from RatesTools v 0.5.12
+/* Elephant Analysis Pipeline version 0.1.0
+Michael G. Campana, 2023
+Smithsonian's National Zoo and Conservation Biology Institute
+
+The software is made available under the Smithsonian Institution terms of use (https://www.si.edu/termsofuse). */
 
 gatk = 'gatk --java-options "' + params.java_options + '" ' // Simplify gatk command line
 
