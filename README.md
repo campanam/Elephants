@@ -6,7 +6,7 @@ This Nextflow [1] pipeline automates the alignment of Illumina sequencing reads 
 
 ## Citation  
 Please cite:  
-Prado, N.A., Armstrong, E., Brown, J.L., Goldenberg, S., Leimgruber, P., Pearson, V.R., Maldonado, J.E., Campana, M.G. In preparation. New genomic tools for Asian (*Elephas maximus*) and African savannah elephant (*Loxodonta africana*) health and conservation.  
+Prado, N.A., Armstrong, E., Brown, J.L., Goldenberg, S.Z., Leimgruber, P., Pearson, V.R., Maldonado, J.E., Campana, M.G. In preparation. New genomic tools for Asian (*Elephas maximus*) and African savannah elephant (*Loxodonta africana*) health and conservation.  
 
 ## License  
 This software is licensed under the Smithsonian Institution [terms of use](https://www.si.edu/termsofuse).  
