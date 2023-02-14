@@ -23,7 +23,7 @@ The `nextflow.config` file included with this repository contains a standard pro
 `samples`: Path to the CSV detailing sequencing libraries (See below)  
 `reads`: Path to the folder containing the FASTQ read pairs  
 `min_uniq_mapped`: Minimum number of unique mapped reads to retain an alignment file
-`java_options`: String of options for executing Java 1.8
+`java_options`: String of options for executing Java 1.8  
 `email`: Email to send completion status to. Set to "NULL" for no email.  
 
 ## Sample CSV File  
