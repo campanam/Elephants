@@ -24,7 +24,7 @@ The `nextflow.config` file included with this repository contains a standard pro
 `reads`: Path to the folder containing the FASTQ read pairs  
 `min_uniq_mapped`: Minimum number of unique mapped reads to retain an alignment file
 `java_options`: String of options for executing Java 1.8  
-`email`: Email to send completion status to. Set to "NULL" for no email.  
+`email`: Email to send completion status. Set to "NULL" for no email.  
 
 ## Sample CSV File  
 The pipeline expects a headered CSV file listing samples and libraries with the following columns:  
