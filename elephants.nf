@@ -330,6 +330,7 @@ process mergedFlagStats {
 // Add different channels together
 final_mt_ch2 = final_mt_ch.mix(final_mt_skip_ch)
 final_bam_ch2 = final_bam_ch.mix(final_bam_skip_ch)
+final_bam_ch2.unique().into { final_bam_ch_Var;final_bam_ch_PSMC }
 
 
 process callMtVariants {
@@ -361,7 +362,7 @@ process callGenomeVariants {
 	publishDir "$params.outdir/05_IndividualgVCFs/genome", mode: 'copy'
 	
 	input:
-	path final_bam from final_bam_ch2.unique()
+	path final_bam from final_bam_ch_Var
 	path genome from params.refseq
 	path genome_fai from fai_refseq_laln_ch
 	
@@ -376,6 +377,44 @@ process callGenomeVariants {
 
 }
 
+process runPSMC {
+
+	// Generate consensus sequence and run PSMC
+	
+	publishDir "$params.outdir/06_PSMC", mode: 'copy'
+	
+	input:
+	path final_bam from final_bam_ch_PSMC
+	path genome from params.refseq
+	path genome_fai from fai_refseq_laln_ch
+	val psmc_mpileup_opts from params.psmc_mpileup_opts
+	val psmc_vcfutils_opts from params.psmc_vcfutils_opts
+	val psmc_psmcfa_opts from params.psmc_psmcfa_opts
+	val psmc_opts from params.psmc_opts
+	val psmc_bootstrap from params.psmc_bootstrap
+	val psmc_plot_opts from params.psmc_plot_opts
+	
+	output:
+	path "${final_bam.simpleName}.fq.gz"
+	path "${final_bam.simpleName}*.psmcfa"
+	path "${final_bam.simpleName}_bootstrapped.psmc"
+	path "${final_bam.simpleName}_bootstrapped.eps"
+	
+	when:
+	params.psmc == true
+	
+	"""
+	#!/usr/bin/env bash
+	bcftools mpileup $psmc_mpileup_opts -Ou --ignore-RG -f $genome $final_bam | bcftools call -c | vcfutils.pl vcf2fq $psmc_vcfutils_opts | gzip > ${final_bam.simpleName}.fq.gz
+	fq2psmca psmc_psmcfa_opts ${final_bam.simpleName}.fq.gz > ${final_bam.simpleName}.psmcfa
+	splitfa ${final_bam.simpleName}.psmcfa > ${final_bam.simpleName}_split.psmcfa
+	psmc $psmc_opts -o ${final_bam.simpleName}.psmc ${final_bam.simpleName}.psmcfa
+	for i in {1..$params.psmc_bootstrap}; do psmc $psmc_opts -b -o ${final_bam.simpleName}_split\$i.psmc ${final_bam.simpleName}_split.psmcfa; done
+	cat ${final_bam.simpleName}.psmc ${final_bam.simpleName}_split*.psmc > ${final_bam.simpleName}_bootstrapped.psmc
+	psmc_plot.pl $psmc_plot_opts ${final_bam.simpleName}_bootstrapped ${final_bam.simpleName}_bootstrapped.psmc
+	"""
+
+}
 workflow.onComplete {
 	if (workflow.success) {
 		println "Elephant pipeline completed successfully at $workflow.complete!"
