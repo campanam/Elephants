@@ -348,6 +348,9 @@ process callMtVariants {
 	path "${final_bam.simpleName}.vcf.gz" into gVCF_mt_ch
 	path "${final_bam.simpleName}.vcf.gz.tbi" into gVCF_mt_index_ch
 	
+	when:
+	params.gatk == true
+	
 	"""
 	samtools index $final_bam
 	$gatk HaplotypeCaller -R ${mtDNA} -ploidy 1 -I $final_bam -O ${final_bam.simpleName}.vcf.gz -ERC GVCF -G StandardAnnotation -G AS_StandardAnnotation
@@ -369,6 +372,9 @@ process callGenomeVariants {
 	output:
 	path "${final_bam.simpleName}.vcf.gz" into gVCF_genome_ch
 	path "${final_bam.simpleName}.vcf.gz.tbi" into gVCF_genome_index_ch
+	
+	when:
+	params.gatk == true
 	
 	"""
 	samtools index $final_bam

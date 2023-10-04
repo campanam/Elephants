@@ -25,6 +25,7 @@ The `nextflow.config` file included with this repository contains a standard pro
 `min_uniq_mapped`: Minimum number of unique mapped reads to retain an alignment file  
 `java_options`: String of options for executing Java 1.8  
 `email`: Email to send completion status. Set to "NULL" for no email.  
+`gatk`: Perform genotyping using GATK (true or false)
 `psmc`: Run PSMC analysis (true or false)  
 `psmc_opts`: Parameter line for PSMC program  
 `psmc_mpileup_opts`: BCFtools mpileup filter options for PSMC  
