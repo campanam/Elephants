@@ -406,7 +406,7 @@ process runPSMC {
 	"""
 	#!/usr/bin/env bash
 	bcftools mpileup $psmc_mpileup_opts -Ou --ignore-RG -f $genome $final_bam | bcftools call -c | vcfutils.pl vcf2fq $psmc_vcfutils_opts | gzip > ${final_bam.simpleName}.fq.gz
-	fq2psmca psmc_psmcfa_opts ${final_bam.simpleName}.fq.gz > ${final_bam.simpleName}.psmcfa
+	fq2psmcfa $psmc_psmcfa_opts ${final_bam.simpleName}.fq.gz > ${final_bam.simpleName}.psmcfa
 	splitfa ${final_bam.simpleName}.psmcfa > ${final_bam.simpleName}_split.psmcfa
 	psmc $psmc_opts -o ${final_bam.simpleName}.psmc ${final_bam.simpleName}.psmcfa
 	for i in {1..$params.psmc_bootstrap}; do psmc $psmc_opts -b -o ${final_bam.simpleName}_split\$i.psmc ${final_bam.simpleName}_split.psmcfa; done
