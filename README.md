@@ -2,7 +2,7 @@
 Michael G. Campana, 2023  
 Smithsonian's National Zoo and Consevation Biology Institute  
 
-This Nextflow [1] pipeline automates the alignment of Illumina sequencing reads against a reference genome and mitogenome using BWA-MEM [2], SAMtools [3-4], and the Genome Analysis Toolkit [5].  
+This Nextflow [1] pipeline automates the alignment of Illumina sequencing reads against a reference genome and mitogenome using BWA-MEM [2], SAMtools [3-4], and the Genome Analysis Toolkit [5]. It optionally performs PSMC analysis [6].  
 
 ## Citation  
 Please cite:  
@@ -25,6 +25,14 @@ The `nextflow.config` file included with this repository contains a standard pro
 `min_uniq_mapped`: Minimum number of unique mapped reads to retain an alignment file  
 `java_options`: String of options for executing Java 1.8  
 `email`: Email to send completion status. Set to "NULL" for no email.  
+`gatk`: Perform genotyping using GATK (true or false)  
+`psmc`: Run PSMC analysis (true or false)  
+`psmc_opts`: Parameter line for PSMC program  
+`psmc_mpileup_opts`: BCFtools mpileup filter options for PSMC  
+`psmc_vcfutils_opts`: vcfutils.pl filter options for PSMC  
+`psmc_psmcfa_opts`: fq2psmcfa options for PSMC  
+`psmc_bootstrap`: Number of PSMC bootstrap replicates  
+`psmc_plot_opts`: Options for psmc_plot.pl  
 
 ## Sample CSV File  
 The pipeline expects a headered CSV file listing samples and libraries with the following columns:  
@@ -42,3 +50,4 @@ Execute the pipeline using the following command:
 3. Li, H., Handsaker, B., Wysoker, A., Fennell, T., Ruan, J., Homer, N., Marth, G., Abecasis, G., Durbin, R., 1000 Genome Project Data Processing Subgroup (2009) The Sequence Alignment/Map format and SAMtools. *Bioinformatics*, __25__, 2078-2079. DOI: [10.1093/bioinformatics/btp352](https://academic.oup.com/bioinformatics/article/25/16/2078/204688).  
 4. Danecek, P., Bonfield, J.K., Liddle, J., Marshall, J., Ohan, V., Pollard, M.O., Whitwham, A., Keane, T., McCarthy, S.A., Davies, R.M., Li, H. (2021) Twelves years of SAMtools and BCFtools. *GigaScience*, __10__, giab008. DOI: [10.1093/gigascience/giab008](https://academic.oup.com/gigascience/article/10/2/giab008/6137722).  
 5. McKenna, A., Hanna, M., Banks, E., Sivachenko, A., Cibulskis, K., Kernytsky, A., Garimella, K., Altshuler, D., Gabriel, S., Daly, M., DePristo, M.A. (2010) The Genome Analysis Toolkit: a MapReduce framework for analyzing next-generation DNA sequencing data. *Genome Res*, __20__, 1297-1303. DOI: [10.1101/gr.107524.110](https://genome.cshlp.org/content/20/9/1297.abstract).  
+6. Li, H., Durbin, R. (2011) Inference of human population history from individual whole-genome sequences. *Nature*, __475__, 493-496. DOI [10.1038/nature10231](https://www.nature.com/articles/nature10231).  
