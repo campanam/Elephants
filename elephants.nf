@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-/* Elephant Analysis Pipeline version 0.1.0
+/* Elephant Analysis Pipeline version 0.2.1
 Michael G. Campana, 2023
 Smithsonian's National Zoo and Conservation Biology Institute
 
@@ -183,6 +183,8 @@ sample_bam_ch = modern_bam_ch.groupTuple(by: 1) // Get a channel of unique sampl
 process mergeSampleBAM {
 
 	// Merge libraries by their sample IDs using SAMtools merge
+	
+	publishDir "$params.outdir/03_FinalBAMs", mode: 'copy', pattern: "*_merged_vs_*.mrkdup.bam"
 	
 	input:
 	tuple path(bam), val(sample) from sample_bam_ch
