@@ -1,4 +1,4 @@
-<img align="right" src="NZP-20180628-596SB_thumb">  
+<img align="right" src="NZP-20180628-596SB_thumb.jpg">  
 
 # Elephant Analysis Pipeline  
 Michael G. Campana, 2023  
