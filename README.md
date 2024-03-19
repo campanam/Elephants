@@ -1,6 +1,6 @@
+# Elephant Analysis Pipeline  
 <img align="right" src="NZP-20180628-596SB_thumb.jpg">  
 
-# Elephant Analysis Pipeline  
 Michael G. Campana, 2023  
 Smithsonian's National Zoo & Conservation Biology Institute  
 
@@ -54,4 +54,4 @@ Execute the pipeline using the following command:
 5. McKenna, A., Hanna, M., Banks, E., Sivachenko, A., Cibulskis, K., Kernytsky, A., Garimella, K., Altshuler, D., Gabriel, S., Daly, M., DePristo, M.A. (2010) The Genome Analysis Toolkit: a MapReduce framework for analyzing next-generation DNA sequencing data. *Genome Res*, __20__, 1297-1303. DOI: [10.1101/gr.107524.110](https://genome.cshlp.org/content/20/9/1297.abstract).  
 6. Li, H., Durbin, R. (2011) Inference of human population history from individual whole-genome sequences. *Nature*, __475__, 493-496. DOI [10.1038/nature10231](https://www.nature.com/articles/nature10231).
 
-Image Credit: Skip Brown. 2018. Smithsonian's National Zoo & Conservation Biology Institute. Smithsonian Institution. (https://www.si.edu/object/asian-elephant:nzp_NZP-20180628-596SB).  
+Image Credit: Skip Brown. 2018. Smithsonian's National Zoo & Conservation Biology Institute. Smithsonian Institution. https://www.si.edu/object/asian-elephant:nzp_NZP-20180628-596SB.  
