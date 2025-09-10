@@ -436,7 +436,7 @@ workflow {
 			trimReads(read_data, params.trimparams)
 			alignSeqs(trimReads.out, params.refseq, prepareRef.out)
 		} else {
-			alignSeqs(read_data, params.refseq, prepareRef.out)
+			alignSeqs(read_data[0..4], params.refseq, prepareRef.out)
 		}
 		if (params.circular_mtDNA) {
 			alignMitoSeqs(alignSeqs.out.bam, alignSeqs.out.sample, alignSeqs.out.library_rg, params.mtDNA, prepareMitoRef.out)
