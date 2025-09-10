@@ -98,7 +98,8 @@ process alignMitoSeqs {
 	input:
 	path(bam)
 	val(sample)
-	tuple val(library), val(rg)
+	val(library)
+	val(rg)
 	path mtDNA
 	path "*"
 	
