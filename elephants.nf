@@ -183,7 +183,7 @@ process flagStats {
 	
 	input:
 	tuple path(mrkdupbam), val(sample)
-	val(minmapped) from params.min_uniq_mapped
+	val(minmapped)
 	
 	output:
 	path("${mrkdupbam.simpleName}.stats.txt")
