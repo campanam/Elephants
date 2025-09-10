@@ -12,6 +12,8 @@ Standardization with other pipelines
 Bumped SAMtools/BCFtools versions  
 Bumped GATK version  
 Added Picard/sambamba mark duplicates options  
+Bumped BWA version  
+Bumpled zlib version  
 Added csi index option  
 
 ### Version 0.2.1  
