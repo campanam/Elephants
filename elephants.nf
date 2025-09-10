@@ -62,8 +62,8 @@ process trimReads {
 	
 	"""
 	AdapterRemoval --file1 $reads1 --file2 $reads2 --basename $library --adapter1 $adapter1 --adapter2 $adapter2 --gzip $trimparams
-	mv ${library}.pair1.truncated.gz > ${library}_R1.trunc.fastq.gz
-	mv ${library}.pair2.truncated.gz > ${library}_R2.trunc.fastq.gz
+	mv ${library}.pair1.truncated.gz ${library}_R1.trunc.fastq.gz
+	mv ${library}.pair2.truncated.gz ${library}_R2.trunc.fastq.gz
 	"""
 
 }
