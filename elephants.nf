@@ -418,7 +418,7 @@ workflow mtDNA_processing {
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		mergeSampleBAM(flagStats.out.bam)
 		mergedLeftAlignIndels(mergeSampleBAM.out.merged, mtDNA, mtDNA_files) | mergedMarkDup | mergedFlagStats
-		if params.gatk { callMtVariants(mergeSampleBAM.out.mt.mix(mergedMarkDup.out), mtDNA, mtDNA_files) }
+		if (params.gatk) { callMtVariants(mergeSampleBAM.out.mt.mix(mergedMarkDup.out), mtDNA, mtDNA_files) }
 	emit:
 		final_bams = mergedMarkDup.out
 		gatk = callMtVariants.out
