@@ -436,16 +436,5 @@ workflow {
 		} else {
 			alignSeqs(read_data, params.refseq, prepareRef.out)
 		}
-		if (params.circular_mtDNA) {
-			alignMitoSeqs(alignSeqs.out.bam_sample, alignSeqs.out.library_rg, params.mtDNA, prepareMitoRef.out)
-			mtDNA_processing(alignMitoSeq.out, params.mtDNA, prepareMitoRef.out)
-		} 
-		leftAlignIndels(alignSeqs.out.bam_sample, params.refseq, prepareRef.out) | markDuplicates
-		flagStats(markDuplicates.out, params.min_uniq_mapped)
-		mergeSampleBAM(flagStats.out.bam)
-		mergedLeftAlignIndels(mergeSampleBAM.out.merged, params.refseq, prepareRef.out) | mergedMarkDup | mergedFlagStats
-		final_bams = mergeSampleBAM.out.genome.mix(mergedMarkDup.out)
-		if (params.gatk) { callGenomeVariants(final_bams, params.refseq, prepareRef.out) }
-		if (params.psmc) { runPSMC(final_bams, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
-}
+		}
 	
