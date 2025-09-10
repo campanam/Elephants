@@ -68,32 +68,27 @@ process trimReads {
 
 }
 
+process alignSeqs {
 
-process alignMitoSeqs {
-
-	// Convert unmapped reads to FASTQ for alignment to mtDNA and align mitochondrial sequences using BWA
+	// Align sequences using BWA
 	
 	input:
-	path(bam)
-	val(sample)
-	tuple val(library), val(rg)
-	path mtDNA
+	tuple val(sample), val(library), path(reads1), path(reads2), val(rg)
+	path refseq
 	path "*"
 	
 	output:
-	tuple path("${library}_vs_mt.bam"), val(sample)
+	tuple(path("${library}_vs_genome.bam"), val(sample)), emit: bam_sample
+	tuple(val(library), val(rg)), emit: library_rg
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
 	"""
-	samtools view -@ ${samtools_extra_threads} -b -f 4 ${bam) | samtools collate -@ ${samtools_extra_threads} -u -O - | samtools fastq -@ ${samtools_extra_threads} -1 ${library}.1.unmapped.fastq.gz -2 ${library}.2.unmapped.fastq.gz -0 /dev/null -s /dev/null
-	bwa aln -t ${task.cpus} ${mtDNA.baseName}_500.fasta ${library}.1.unmapped.fastq.gz > ${library}.1.circ.sai
-	bwa aln -t ${task.cpus} ${mtDNA.baseName}_500.fasta ${library}.2.unmapped.fastq.gz > ${library}.2.circ.sai
-	bwa sampe -r '${rg}' ${mtDNA.baseName}_500.fasta ${library}.1.circ.sai ${library}.2.circ.sai ${library}.1.unmapped.fastq.gz ${library}.2.unmapped.fastq.gz > ${library}.circ.sam
-	$realignsamfile -e 500 -i ${library}.circ.sam -r ${mtDNA}
-	samtools fixmate -@ ${samtools_extra_threads} -m ${library}.circ_realigned.bam - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_mt.bam -
+	bwa mem -t ${task.cpus} -R '${rg}' ${refseq} ${reads1} ${reads2} | samtools fixmate -@ ${samtools_extra_threads} -m - - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_genome.bam -
 	"""
+	
 }
+
 
 process leftAlignIndels {
 
