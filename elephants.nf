@@ -424,7 +424,7 @@ workflow mtDNA_processing {
 	main:
 		leftAlignIndels(alignments, sample, mtDNA, mtDNA_files) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
-		mergeSampleBAM(flagStats.out.bam)
+		mergeSampleBAM(flagStats.out.bam).groupTuple(by: 1)
 		mergedLeftAlignIndels(mergeSampleBAM.out.merged, mergeSampleBAM.out.sample, mtDNA, mtDNA_files) | mergedMarkDup | mergedFlagStats
 		if (params.gatk) { callMtVariants(mergeSampleBAM.out.mt.mix(mergedMarkDup.out), mtDNA, mtDNA_files) }
 	emit:
@@ -451,7 +451,7 @@ workflow {
 		} 
 		leftAlignIndels(alignSeqs.out.bam, alignSeqs.out.sample, params.refseq, prepareRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
-		mergeSampleBAM(flagStats.out.bam)
+		mergeSampleBAM(flagStats.out.bam.groupTuple(by: 1))
 		mergedLeftAlignIndels(mergeSampleBAM.out.merged, mergeSampleBAM.out.sample, params.refseq, prepareRef.out) | mergedMarkDup | mergedFlagStats
 		final_bams = mergeSampleBAM.out.genome.mix(mergedMarkDup.out)
 		if (params.gatk) { callGenomeVariants(final_bams, params.refseq, prepareRef.out) }
