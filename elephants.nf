@@ -206,7 +206,7 @@ process mergeSampleBAM {
 
 	// Merge libraries by their sample IDs using SAMtools merge
 	
-	publishDir "$params.outdir/03_FinalBAMs", mode: 'copy', pattern: "*_merged_vs_*.mrkdup.bam"
+	publishDir "$params.outdir/03_FinalBAMs", mode: 'copy', pattern: "*_merged_vs_*.markdup.bam"
 	
 	input:
 	tuple path(bam), val(sample)
@@ -215,8 +215,8 @@ process mergeSampleBAM {
 	path "${sample}_merged*.bam" // Make sure there is some output
 	val(sample), emit: sample // Allows code reuse
 	path "${sample}_merged*.merged.bam", optional: true, emit: merged // Send samples that need merging to merging processes
-	path "${sample}_merged_vs_genome.mrkdup.bam", optional: true, emit: genome // Skip unnecessary merging steps
-	path "${sample}_merged_vs_mt.mrkdup.bam", optional: true, emit: mt // Skip unnecessary merging steps
+	path "${sample}_merged_vs_genome.markdup.bam", optional: true, emit: genome // Skip unnecessary merging steps
+	path "${sample}_merged_vs_mt.markdup.bam", optional: true, emit: mt // Skip unnecessary merging steps
 	
 	script:
 	samtools_extra_threads = task.cpus -1 
@@ -238,7 +238,7 @@ process mergeSampleBAM {
 	}
 	if (genomebams == 0 && mtbams == 1)
 		"""
-		ln -s $mtbamlist ${sample}_merged_vs_mt.mrkdup.bam
+		ln -s $mtbamlist ${sample}_merged_vs_mt.markdup.bam
 		"""
 	 else if (genomebams == 0 && mtbams > 1)
 		"""
@@ -246,7 +246,7 @@ process mergeSampleBAM {
 		"""
 	else if (mtbams == 0 && genomebams == 1)
 		"""
-		ln -s $genomebamlist ${sample}_merged_vs_genome.mrkdup.bam
+		ln -s $genomebamlist ${sample}_merged_vs_genome.markdup.bam
 		"""
 	else if (mtbams == 0 && genomebams > 1)
 		"""	
@@ -264,7 +264,7 @@ process mergedMarkDup {
 	path(lalnbam)
 	
 	output:
-	path "${lalnbam.simpleName}.mrkdup.bam"
+	path "${lalnbam.simpleName}.markdup.bam"
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
