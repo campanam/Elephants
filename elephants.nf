@@ -431,12 +431,13 @@ workflow {
 	main:
 		prepareRef(params.refseq)
 		if (params.circular_mtDNA) { prepareMitoRef(params.mtDNA) }
-		read_data = Channel.fromPath(params.samples).splitCsv(header:true).map { row -> tuple(row.Sample, row.Library, file(params.reads + row.Read1), file(params.reads + row.Read2), '@RG\\tID:' + row.Library + '\\tSM:' + row.Sample + '\\tLB:ILLUMINA\\tPL:ILLUMINA', row.Adapter1, row.Adapter2)}
 		if (params.read_trimming) {
+			read_data = Channel.fromPath(params.samples).splitCsv(header:true).map { row -> tuple(row.Sample, row.Library, file(params.reads + row.Read1), file(params.reads + row.Read2), '@RG\\tID:' + row.Library + '\\tSM:' + row.Sample + '\\tLB:ILLUMINA\\tPL:ILLUMINA', row.Adapter1, row.Adapter2)}
 			trimReads(read_data, params.trimparams)
 			alignSeqs(trimReads.out, params.refseq, prepareRef.out)
 		} else {
-			alignSeqs(read_data[0..4], params.refseq, prepareRef.out)
+			read_data = Channel.fromPath(params.samples).splitCsv(header:true).map { row -> tuple(row.Sample, row.Library, file(params.reads + row.Read1), file(params.reads + row.Read2), '@RG\\tID:' + row.Library + '\\tSM:' + row.Sample + '\\tLB:ILLUMINA\\tPL:ILLUMINA'}
+			alignSeqs(read_data, params.refseq, prepareRef.out)
 		}
 		if (params.circular_mtDNA) {
 			alignMitoSeqs(alignSeqs.out.bam, alignSeqs.out.sample, alignSeqs.out.library_rg, params.mtDNA, prepareMitoRef.out)
