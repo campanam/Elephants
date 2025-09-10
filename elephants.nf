@@ -78,7 +78,8 @@ process alignSeqs {
 	path "*"
 	
 	output:
-	tuple(path("${library}_vs_genome.bam"), val(sample)), emit: bam_sample
+	path("${library}_vs_genome.bam"), emit: bam
+	val(sample), emit: sample
 	tuple(val(library), val(rg)), emit: library_rg
 	
 	script:
@@ -94,7 +95,8 @@ process alignMitoSeqs {
 	// Convert unmapped reads to FASTQ for alignment to mtDNA and align mitochondrial sequences using BWA
 	
 	input:
-	tuple path(bam), val(sample)
+	path(bam)
+	val(sample)
 	tuple val(library), val(rg)
 	path mtDNA
 	path "*"
@@ -437,7 +439,7 @@ workflow {
 			alignSeqs(read_data, params.refseq, prepareRef.out)
 		}
 		if (params.circular_mtDNA) {
-			alignMitoSeqs(alignSeqs.out.bam_sample, alignSeqs.out.library_rg, params.mtDNA, prepareMitoRef.out)
+			alignMitoSeqs(alignSeqs.out.bam, alignSeqs.out.sample, alignSeqs.out.library_rg, params.mtDNA, prepareMitoRef.out)
 			mtDNA_processing(alignMitoSeq.out, params.mtDNA, prepareMitoRef.out)
 		} 
 		leftAlignIndels(alignSeqs.out.bam_sample, params.refseq, prepareRef.out) | markDuplicates
