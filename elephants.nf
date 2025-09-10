@@ -106,11 +106,7 @@ process alignMitoSeqs {
 	samtools_extra_threads = task.cpus - 1
 	"""
 	samtools view -@ ${samtools_extra_threads} -b -f 4 ${bam) | samtools collate -@ ${samtools_extra_threads} -u -O - | samtools fastq -@ ${samtools_extra_threads} -1 ${library}.1.unmapped.fastq.gz -2 ${library}.2.unmapped.fastq.gz -0 /dev/null -s /dev/null
-	bwa aln -t ${task.cpus} ${mtDNA.baseName}_500.fasta ${library}.1.unmapped.fastq.gz > ${library}.1.circ.sai
-	bwa aln -t ${task.cpus} ${mtDNA.baseName}_500.fasta ${library}.2.unmapped.fastq.gz > ${library}.2.circ.sai
-		$realignsamfile -e 500 -i ${library}.circ.sam -r ${mtDNA}
-	samtools fixmate -@ ${samtools_extra_threads} -m ${library}.circ_realigned.bam - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_mt.bam -
-	
+		
 	"""
 }
 
