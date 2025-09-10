@@ -78,10 +78,9 @@ process alignSeqs {
 	path "*"
 	
 	output:
-	tuple file("${library}_vs_genome.bam"), val(sample), emit: bam_sample
-	tuple val(library), val(rg), emit: library_rg
+	tuple(path("${library}_vs_genome.bam"), val(sample)), emit: bam_sample
+	tuple(val(library), val(rg)), emit: library_rg
 	
-
 	script:
 	samtools_extra_threads = task.cpus - 1
 	"""
