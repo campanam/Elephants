@@ -213,6 +213,7 @@ process mergeSampleBAM {
 	
 	output:
 	path "${sample}_merged*.bam" // Make sure there is some output
+	val(sample), emit: sample // Allows code reuse
 	path "${sample}_merged*.merged.bam", optional: true, emit: merged // Send samples that need merging to merging processes
 	path "${sample}_merged_vs_genome.mrkdup.bam", optional: true, emit: genome // Skip unnecessary merging steps
 	path "${sample}_merged_vs_mt.mrkdup.bam", optional: true, emit: mt // Skip unnecessary merging steps
@@ -404,10 +405,11 @@ workflow mergedLeftAlignIndels {
 	// Left-align indels of merged data
 	take:
 		alignments
+		sample
 		refseq
 		refseq_files
 	main:
-		leftAlignIndels(alignments, refseq, refseq_files)
+		leftAlignIndels(alignments, sample, refseq, refseq_files)
 	emit:
 		leftAlignIndels.out
 }
@@ -423,7 +425,7 @@ workflow mtDNA_processing {
 		leftAlignIndels(alignments, sample, mtDNA, mtDNA_files) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		mergeSampleBAM(flagStats.out.bam)
-		mergedLeftAlignIndels(mergeSampleBAM.out.merged, mtDNA, mtDNA_files) | mergedMarkDup | mergedFlagStats
+		mergedLeftAlignIndels(mergeSampleBAM.out.merged, mergeSampleBAM.out.sample, mtDNA, mtDNA_files) | mergedMarkDup | mergedFlagStats
 		if (params.gatk) { callMtVariants(mergeSampleBAM.out.mt.mix(mergedMarkDup.out), mtDNA, mtDNA_files) }
 	emit:
 		final_bams = mergedMarkDup.out
