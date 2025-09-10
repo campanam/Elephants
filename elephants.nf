@@ -80,7 +80,8 @@ process alignSeqs {
 	output:
 	path("${library}_vs_genome.bam"), emit: bam
 	val(sample), emit: sample
-	tuple(val(library), val(rg)), emit: library_rg
+	val(library), emit: library
+	val(rg), emit: rg
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
@@ -122,7 +123,8 @@ process leftAlignIndels {
 	// Left Align Indels using GATK4 LeftAlignIndels
 	
 	input:
-	tuple path(rg_bam), val(sample)
+	path(rg_bam)
+	val(sample)
 	path refseq
 	path "*"
 	
@@ -413,10 +415,11 @@ workflow mtDNA_processing {
 	// Left-align indels, merge and mark duplicates for mtDNA BAMs.
 	take:
 		alignments
+		sample
 		mtDNA
 		mtDNA_files
 	main:
-		leftAlignIndels(alignments, mtDNA, mtDNA_files) | markDuplicates
+		leftAlignIndels(alignments, sample, mtDNA, mtDNA_files) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		mergeSampleBAM(flagStats.out.bam)
 		mergedLeftAlignIndels(mergeSampleBAM.out.merged, mtDNA, mtDNA_files) | mergedMarkDup | mergedFlagStats
@@ -440,10 +443,10 @@ workflow {
 			alignSeqs(read_data, params.refseq, prepareRef.out)
 		}
 		if (params.circular_mtDNA) {
-			alignMitoSeqs(alignSeqs.out.bam, alignSeqs.out.sample, alignSeqs.out.library_rg, params.mtDNA, prepareMitoRef.out)
+			alignMitoSeqs(alignSeqs.out.bam, alignSeqs.out.sample, alignSeqs.out.library, alignSeqs.out.rg, params.mtDNA, prepareMitoRef.out)
 			mtDNA_processing(alignMitoSeq.out, params.mtDNA, prepareMitoRef.out)
 		} 
-		leftAlignIndels(alignSeqs.out.bam_sample, params.refseq, prepareRef.out) | markDuplicates
+		leftAlignIndels(alignSeqs.out.bam, alignSeqs.out.bam.sample, params.refseq, prepareRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		mergeSampleBAM(flagStats.out.bam)
 		mergedLeftAlignIndels(mergeSampleBAM.out.merged, params.refseq, prepareRef.out) | mergedMarkDup | mergedFlagStats
