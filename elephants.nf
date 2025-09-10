@@ -156,7 +156,7 @@ process markDuplicates {
 	tuple path(lalnbam), val(sample)
 	
 	output:
-	tuple path("${lalnbam.simpleName}.mrkdup.bam"), val(sample)
+	tuple path("${lalnbam.simpleName}.markdup.bam"), val(sample)
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
