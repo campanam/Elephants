@@ -68,26 +68,6 @@ process trimReads {
 
 }
 
-process alignSeqs {
-
-	// Align sequences using BWA
-	
-	input:
-	tuple val(sample), val(library), path(reads1), path(reads2), val(rg)
-	path refseq
-	path "*"
-	
-	output:
-	tuple(path("${library}_vs_genome.bam"), val(sample)) //, emit: bam_sample
-	tuple(val(library), val(rg)) //, emit: library_rg
-	
-	script:
-	samtools_extra_threads = task.cpus - 1
-	"""
-	bwa mem -t ${task.cpus} -R '${rg}' ${refseq} ${reads1} ${reads2} | samtools fixmate -@ ${samtools_extra_threads} -m - - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_genome.bam -
-	"""
-	
-}
 
 process alignMitoSeqs {
 
