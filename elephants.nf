@@ -271,8 +271,8 @@ process mergedStats {
 
 	// Calculate alignment statistics using SAMtools flagstat
 	
-	publishDir "$params.outdir/04_MergedFlagStats", mode: 'copy', pattern: "*.markdup.bam"
-	publishDir "$params.outdir/06_MapQFlagStats", mode: 'copy', pattern: "*.mapq.bam"
+	publishDir "$params.outdir/04_MergedStats", mode: 'copy', pattern: "*.markdup.bam"
+	publishDir "$params.outdir/06_MapQStats", mode: 'copy', pattern: "*.mapq.bam"
 	
 	input:
 	path mrkdupbam
