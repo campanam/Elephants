@@ -434,8 +434,9 @@ workflow mapqStats {
 	// Alias of mergedStats for MapQ-filtered data
 	take:
 		bam
+		extension
 	main:
-		mergedStats(bam)
+		mergedStats(bam, extension)
 	emit:
 		mergedStats.out
 }
