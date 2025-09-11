@@ -210,7 +210,8 @@ process mergeSampleBAM {
 	publishDir "$params.outdir/03_FinalBAMs", mode: 'copy', pattern: "*_merged_vs_*.markdup.bam"
 	
 	input:
-	tuple path(bam), val(sample), val(marker)
+	tuple path(bam), val(sample)
+	val(marker)
 	
 	output:
 	path "${sample}_vs_${marker}_merged.bam"
