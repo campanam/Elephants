@@ -245,10 +245,10 @@ process mergedMarkDup {
 	
 	input:
 	tuple path(lalnbam), val(sample)
+	val(marker)
 	
 	output:
-	path "${sample}_vs_genome_merged.markdup.bam", optional: true, emit: genome
-	path "${sample}_vs_mt_merged.markdup.bam", optional: true, emit: mt
+	path "${sample}_vs_${marker}_merged.markdup.bam"
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
@@ -423,7 +423,8 @@ workflow merge_samples {
 		refseq_files
 	main:
 		mergeSampleBAM(samples, marker)
-		leftAlignIndels(mergeSampleBAM.out.bam, mergeSampleBAM.out.sample, refseq, refseq_files) | mergedMarkDup
+		leftAlignIndels(mergeSampleBAM.out.bam, mergeSampleBAM.out.sample, refseq, refseq_files) 
+		mergedMarkDup(leftAlignIndels.out, marker)
 	emit:
 		mt = mergedMarkDup.out.mt
 		genome = mergedMarkDup.out.genome
