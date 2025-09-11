@@ -447,7 +447,7 @@ workflow {
 		}
 		if (params.circular_mtDNA) {
 			alignMitoSeqs(alignSeqs.out.bam, alignSeqs.out.sample, alignSeqs.out.library, alignSeqs.out.rg, params.mtDNA, prepareMitoRef.out)
-			mtDNA_processing(alignMitoSeq.out, params.mtDNA, prepareMitoRef.out)
+			mtDNA_processing(alignMitoSeqs.out, params.mtDNA, prepareMitoRef.out)
 		} 
 		leftAlignIndels(alignSeqs.out.bam, alignSeqs.out.sample, params.refseq, prepareRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
