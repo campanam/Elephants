@@ -261,7 +261,7 @@ process mergedMarkDup {
 	publishDir "$params.outdir/03_FinalBAMs", mode: 'copy'
 	
 	input:
-	path(lalnbam)
+	tuple path(lalnbam), val(sample)
 	
 	output:
 	path "${lalnbam.simpleName}.markdup.bam"
