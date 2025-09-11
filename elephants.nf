@@ -316,7 +316,8 @@ process callMtVariants {
 	path "*"
 	
 	output:
-	tuple path "${final_bam.simpleName}.vcf.gz", path "${final_bam.simpleName}.vcf.gz.tbi"
+	path "${final_bam.simpleName}.vcf.gz"
+	path "${final_bam.simpleName}.vcf.gz.tbi"
 	
 	"""
 	samtools index $final_bam
@@ -337,7 +338,8 @@ process callGenomeVariants {
 	path "*"
 	
 	output:
-	tuple path "${final_bam.simpleName}.vcf.gz", path "${final_bam.simpleName}.vcf.gz.tbi"
+	path "${final_bam.simpleName}.vcf.gz"
+	path "${final_bam.simpleName}.vcf.gz.tbi"
 	
 	"""
 	samtools index $final_bam
@@ -428,7 +430,6 @@ workflow mtDNA_processing {
 		if (params.gatk) { callMtVariants(mergeSampleBAM.out.mt.mix(mergedMarkDup.out), mtDNA, mtDNA_files) }
 	emit:
 		final_bams = mergedMarkDup.out
-		gatk = callMtVariants.out
 		
 }
 
