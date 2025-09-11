@@ -426,8 +426,7 @@ workflow merge_samples {
 		leftAlignIndels(mergeSampleBAM.out.bam, mergeSampleBAM.out.sample, refseq, refseq_files) 
 		mergedMarkDup(leftAlignIndels.out, marker)
 	emit:
-		mt = mergedMarkDup.out.mt
-		genome = mergedMarkDup.out.genome
+		mergedMarkDup.out
 }
 
 workflow mapqStats {
