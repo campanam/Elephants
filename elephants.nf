@@ -456,7 +456,7 @@ workflow mtDNA_processing {
 		filterMapQ(merge_samples.out, params.mapq) | mapqStats
 		if (params.gatk) { callMtVariants(filterMapQ.out, params.mtDNA, prepareMitoRef.out) }
 	emit:
-		merge_samples.out.mt
+		merge_samples.out
 		
 }
 
