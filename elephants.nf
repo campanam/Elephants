@@ -104,7 +104,8 @@ process alignMitoSeqs {
 	path "*"
 	
 	output:
-	tuple path("${library}_vs_mt.bam"), val(sample)
+	path("${library}_vs_mt.bam"), emit: bam
+	val(sample), emit: sample
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
@@ -447,7 +448,7 @@ workflow {
 		}
 		if (params.circular_mtDNA) {
 			alignMitoSeqs(alignSeqs.out.bam, alignSeqs.out.sample, alignSeqs.out.library, alignSeqs.out.rg, params.mtDNA, prepareMitoRef.out)
-			mtDNA_processing(alignMitoSeqs.out, params.mtDNA, prepareMitoRef.out)
+			mtDNA_processing(alignMitoSeqs.out.bam, alignMitoSeqs.out.sample, params.mtDNA, prepareMitoRef.out)
 		} 
 		leftAlignIndels(alignSeqs.out.bam, alignSeqs.out.sample, params.refseq, prepareRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
