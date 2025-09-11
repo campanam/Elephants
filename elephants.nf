@@ -316,8 +316,7 @@ process callMtVariants {
 	path "*"
 	
 	output:
-	path "${final_bam.simpleName}.vcf.gz"
-	path "${final_bam.simpleName}.vcf.gz.tbi"
+	tuple path "${final_bam.simpleName}.vcf.gz", path "${final_bam.simpleName}.vcf.gz.tbi"
 	
 	"""
 	samtools index $final_bam
@@ -338,8 +337,7 @@ process callGenomeVariants {
 	path "*"
 	
 	output:
-	path "${final_bam.simpleName}.vcf.gz"
-	path "${final_bam.simpleName}.vcf.gz.tbi"
+	tuple path "${final_bam.simpleName}.vcf.gz", path "${final_bam.simpleName}.vcf.gz.tbi"
 	
 	"""
 	samtools index $final_bam
