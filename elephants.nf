@@ -413,6 +413,7 @@ workflow merge_samples {
 		leftAlignIndels(mergeSampleBAM.out.merged, mergeSampleBAM.out.sample, refseq, refseq_files) | mergedMarkDup | mergedFlagStats
 	emit:
 		genome = mergeSampleBAM.out.genome
+		mt = mergeSampleBAM.out.mt
 }
 
 workflow mtDNA_processing {
@@ -428,7 +429,8 @@ workflow mtDNA_processing {
 		leftAlignIndels(alignMitoSeqs.out.bam, alignMitoSeqs.out.sample, params.mtDNA, prepareMitoRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		merge_samples(flagStats.out.bam.groupTuple(by: 1), params.mtDNA, prepareMitoRef.out)
-		if (params.gatk) { callMtVariants(mergeSampleBAM.out.mt.mix(mergedMarkDup.out), params.mtDNA, prepareMitoRef.out) }
+		final_mt_bams = merge_samples.out.mt.mix(mergedMarkDup.out)
+		if (params.gatk) { callMtVariants(final_mt_bams, params.mtDNA, prepareMitoRef.out) }
 	emit:
 		final_bams = mergedMarkDup.out
 		
