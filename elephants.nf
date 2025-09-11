@@ -433,7 +433,7 @@ workflow mtDNA_processing {
 		final_mt_bams = merge_samples.out.mt.mix(merge_samples.out.mrkdup)
 		if (params.gatk) { callMtVariants(final_mt_bams, params.mtDNA, prepareMitoRef.out) }
 	emit:
-		final_bams = mergedMarkDup.out
+		final_bams = final_mt_bams
 		
 }
 
