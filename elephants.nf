@@ -210,48 +210,26 @@ process mergeSampleBAM {
 	publishDir "$params.outdir/03_FinalBAMs", mode: 'copy', pattern: "*_merged_vs_*.markdup.bam"
 	
 	input:
-	tuple path(bam), val(sample)
+	tuple path(bam), val(sample), val(marker)
 	
 	output:
-	path "${sample}_merged*.bam" // Make sure there is some output
-	val(sample), emit: sample // Allows code reuse
-	path "${sample}_merged*.merged.bam", optional: true, emit: merged // Send samples that need merging to merging processes
-	path "${sample}_merged_vs_genome.markdup.bam", optional: true, emit: genome // Skip unnecessary merging steps
-	path "${sample}_merged_vs_mt.markdup.bam", optional: true, emit: mt // Skip unnecessary merging steps
+	path "${sample}_vs_${marker}_merged.bam"
 	
 	script:
-	samtools_extra_threads = task.cpus -1 
-	// First make sure that an input file exists for each type of alignment since could have been removed earlier. If no alignments exist, the whole sample should have been removed previously.
-	mtbamlist = ""
-	genomebamlist = ""
-	// Since this is now accessed independently by both data streams, only need to consider cases where one or the other has 0
-	mtbams = 0 // Count of mt bams
-	genomebams = 0 // Count of genome bams
+	samtools_extra_threads = task.cpus - 1
+	bams = 0
+	bamlist = ""
 	for (i in bam) {
-		category = i.simpleName.split("_vs_")[1]
-		if (category == "mt") {
-			mtbams++
-			mtbamlist = mtbamlist + " " + i
-		} else {
-			genomebams++
-			genomebamlist = genomebamlist + " " + i
-		}
+		bams++
+		bamlist = bamlist + " " + i
 	}
-	if (genomebams == 0 && mtbams == 1)
+	if (bams == 1) // Skip merging single libraries
 		"""
-		ln -s $mtbamlist ${sample}_merged_vs_mt.markdup.bam
+		ln -s $bamlist ${sample}_vs_${marker}_merged.bam
 		"""
-	 else if (genomebams == 0 && mtbams > 1)
+	else
 		"""
-		samtools merge -@ ${samtools_extra_threads} ${sample}_merged_vs_mt.merged.bam $mtbamlist
-		"""
-	else if (mtbams == 0 && genomebams == 1)
-		"""
-		ln -s $genomebamlist ${sample}_merged_vs_genome.markdup.bam
-		"""
-	else if (mtbams == 0 && genomebams > 1)
-		"""	
-		samtools merge -@ ${samtools_extra_threads} ${sample}_merged_vs_genome.merged.bam $genomebamlist
+		samtools merge -@ ${samtools_extra_threads} -o ${sample}_vs_${marker}_merged.bam $bamlist
 		"""
 } 
 
@@ -265,7 +243,8 @@ process mergedMarkDup {
 	tuple path(lalnbam), val(sample)
 	
 	output:
-	path "${lalnbam.simpleName}.markdup.bam"
+	path "${sample}_vs_genome_merged.markdup.bam", optional: true, emit: genome
+	path "${sample}_vs_mt_merged.markdup.bam", optional: true, emit: mt
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
@@ -406,15 +385,15 @@ workflow merge_samples {
 	// Left-align indels of merged data
 	take:
 		samples
+		marker
 		refseq
 		refseq_files
 	main:
-		mergeSampleBAM(samples)
+		mergeSampleBAM(samples, marker)
 		leftAlignIndels(mergeSampleBAM.out.merged, mergeSampleBAM.out.sample, refseq, refseq_files) | mergedMarkDup | mergedFlagStats
 	emit:
-		genome = mergeSampleBAM.out.genome
-		mt = mergeSampleBAM.out.mt
-		mrkdup = mergedMarkDup.out
+		mt = mergedMarkDup.out.mt
+		genome = mergedMarkDup.out.genome
 }
 
 workflow mtDNA_processing {
@@ -429,9 +408,8 @@ workflow mtDNA_processing {
 		alignMitoSeqs(alignments, sample, library, rg, params.mtDNA, prepareMitoRef.out)
 		leftAlignIndels(alignMitoSeqs.out.bam, alignMitoSeqs.out.sample, params.mtDNA, prepareMitoRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
-		merge_samples(flagStats.out.bam.groupTuple(by: 1), params.mtDNA, prepareMitoRef.out)
-		final_mt_bams = merge_samples.out.mt.mix(merge_samples.out.mrkdup)
-		if (params.gatk) { callMtVariants(final_mt_bams, params.mtDNA, prepareMitoRef.out) }
+		merge_samples(flagStats.out.bam.groupTuple(by: 1), "mt", params.mtDNA, prepareMitoRef.out)
+		if (params.gatk) { callMtVariants(merge_samples.out.mt, params.mtDNA, prepareMitoRef.out) }
 	emit:
 		final_bams = final_mt_bams
 		
@@ -451,9 +429,8 @@ workflow {
 		if (params.circular_mtDNA) { mtDNA_processing(alignSeqs.out.bam, alignSeqs.out.sample, alignSeqs.out.library, alignSeqs.out.rg) } 
 		leftAlignIndels(alignSeqs.out.bam, alignSeqs.out.sample, params.refseq, prepareRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
-		merge_samples(flagStats.out.bam.groupTuple(by: 1), params.refseq, prepareRef.out)
-		final_bams = merge_samples.out.genome.mix(merge_samples.out.mrkdup)
-		if (params.gatk) { callGenomeVariants(final_bams, params.refseq, prepareRef.out) }
-		if (params.psmc) { runPSMC(final_bams, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
+		merge_samples(flagStats.out.bam.groupTuple(by: 1), "genome", params.refseq, prepareRef.out)
+		if (params.gatk) { callGenomeVariants(merge_samples.out.genome, params.refseq, prepareRef.out) }
+		if (params.psmc) { runPSMC(merge_samples.out.genome, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
 }
 	
