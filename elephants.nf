@@ -414,6 +414,7 @@ workflow merge_samples {
 	emit:
 		genome = mergeSampleBAM.out.genome
 		mt = mergeSampleBAM.out.mt
+		mrkdup = mergedMarkDup.out
 }
 
 workflow mtDNA_processing {
@@ -429,7 +430,7 @@ workflow mtDNA_processing {
 		leftAlignIndels(alignMitoSeqs.out.bam, alignMitoSeqs.out.sample, params.mtDNA, prepareMitoRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		merge_samples(flagStats.out.bam.groupTuple(by: 1), params.mtDNA, prepareMitoRef.out)
-		final_mt_bams = merge_samples.out.mt.mix(mergedMarkDup.out)
+		final_mt_bams = merge_samples.out.mt.mix(merge_samples.out.mrkdup)
 		if (params.gatk) { callMtVariants(final_mt_bams, params.mtDNA, prepareMitoRef.out) }
 	emit:
 		final_bams = mergedMarkDup.out
@@ -450,7 +451,7 @@ workflow {
 		if (params.circular_mtDNA) { mtDNA_processing(alignSeqs.out.bam, alignSeqs.out.sample, alignSeqs.out.library, alignSeqs.out.rg) } 
 		leftAlignIndels(alignSeqs.out.bam, alignSeqs.out.sample, params.refseq, prepareRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
-		final_bams = merge_samples.out.genome.mix(mergedMarkDup.out)
+		final_bams = merge_samples.out.genome.mix(merge_samples.out.mrkdup)
 		if (params.gatk) { callGenomeVariants(final_bams, params.refseq, prepareRef.out) }
 		if (params.psmc) { runPSMC(final_bams, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
 }
