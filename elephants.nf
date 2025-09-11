@@ -271,11 +271,12 @@ process mergedStats {
 
 	// Calculate alignment statistics using SAMtools flagstat
 	
-	publishDir "$params.outdir/04_MergedStats", mode: 'copy', pattern: "*.markdup.bam"
-	publishDir "$params.outdir/06_MapQStats", mode: 'copy', pattern: "*.mapq.bam"
+	publishDir "$params.outdir/04_MergedStats", mode: 'copy', pattern: "*.markdup.stats.txt"
+	publishDir "$params.outdir/06_MapQStats", mode: 'copy', pattern: "*.mapq.stats.txt"
 	
 	input:
 	path mrkdupbam
+	val extension
 	
 	output:
 	path "${mrkdupbam.simpleName}.*.txt"
@@ -283,9 +284,9 @@ process mergedStats {
 	script:
 	samtools_extra_threads = task.cpus - 1
 	"""
-	samtools flagstat -@ ${samtools_extra_threads} ${mrkdupbam} > ${mrkdupbam.simpleName}.stats.txt
-	samtools depth -@ ${samtools_extra_threads} $mrkdupbam > ${mrkdupbam.simpleName}.depth.txt
-	samtools coverage $mrkdupbam > ${mrkdupbam.simpleName}.coverage.txt
+	samtools flagstat -@ ${samtools_extra_threads} ${mrkdupbam} > ${mrkdupbam.simpleName}.${extension}.stats.txt
+	samtools depth -@ ${samtools_extra_threads} $mrkdupbam > ${mrkdupbam.simpleName}.${extension}.depth.txt
+	samtools coverage $mrkdupbam > ${mrkdupbam.simpleName}.${extension}.coverage.txt
 	"""
 
 }
@@ -452,8 +453,9 @@ workflow mtDNA_processing {
 		leftAlignIndels(alignMitoSeqs.out.bam, alignMitoSeqs.out.sample, params.mtDNA, prepareMitoRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		merge_samples(flagStats.out.bam.groupTuple(by: 1), "mt", params.mtDNA, prepareMitoRef.out)
-		mergedStats(merge_samples.out)
-		filterMapQ(merge_samples.out, params.mapq) | mapqStats
+		mergedStats(merge_samples.out, "markdup")
+		filterMapQ(merge_samples.out, params.mapq) 
+		mapqStats(filterMapQ.out, "mapq")
 		if (params.gatk) { callMtVariants(filterMapQ.out, params.mtDNA, prepareMitoRef.out) }
 	emit:
 		merge_samples.out
@@ -476,7 +478,8 @@ workflow {
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		merge_samples(flagStats.out.bam.groupTuple(by: 1), "genome", params.refseq, prepareRef.out)
 		mergedStats(merge_samples.out)
-		filterMapQ(merge_samples.out, params.mapq) | mapqStats
+		filterMapQ(merge_samples.out, params.mapq)
+		mapqStats(filterMapQ.out, "mapq")
 		if (params.gatk) { callGenomeVariants(filterMapQ.out, params.refseq, prepareRef.out) }
 		if (params.psmc) { runPSMC(filterMapQ.out, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
 }
