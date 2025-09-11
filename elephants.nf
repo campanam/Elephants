@@ -434,9 +434,9 @@ workflow mapqStats {
 	take:
 		bam
 	main:
-		mergeStats(bam)
+		mergedStats(bam)
 	emit:
-		mergeStats.out
+		mergedStats.out
 }
 
 workflow mtDNA_processing {
