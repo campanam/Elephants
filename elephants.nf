@@ -214,7 +214,8 @@ process mergeSampleBAM {
 	val(marker)
 	
 	output:
-	path "${sample}_vs_${marker}_merged.bam"
+	path "${sample}_vs_${marker}_merged.bam", emit: bam
+	val(sample), emit: sample
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
@@ -391,7 +392,7 @@ workflow merge_samples {
 		refseq_files
 	main:
 		mergeSampleBAM(samples, marker)
-		leftAlignIndels(mergeSampleBAM.out.merged, mergeSampleBAM.out.sample, refseq, refseq_files) | mergedMarkDup | mergedFlagStats
+		leftAlignIndels(mergeSampleBAM.out.bam, mergeSampleBAM.out.sample, refseq, refseq_files) | mergedMarkDup | mergedFlagStats
 	emit:
 		mt = mergedMarkDup.out.mt
 		genome = mergedMarkDup.out.genome
