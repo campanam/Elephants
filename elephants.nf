@@ -392,7 +392,8 @@ workflow merge_samples {
 		refseq_files
 	main:
 		mergeSampleBAM(samples, marker)
-		leftAlignIndels(mergeSampleBAM.out.bam, mergeSampleBAM.out.sample, refseq, refseq_files) | mergedMarkDup | mergedFlagStats
+		leftAlignIndels(mergeSampleBAM.out.bam, mergeSampleBAM.out.sample, refseq, refseq_files) | mergedMarkDup
+		mergedFlagStats(eval(mergedMarkDup.out.marker))
 	emit:
 		mt = mergedMarkDup.out.mt
 		genome = mergedMarkDup.out.genome
