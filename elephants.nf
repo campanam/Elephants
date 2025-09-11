@@ -434,9 +434,8 @@ workflow mapqStats {
 	// Alias of mergedStats for MapQ-filtered data
 	take:
 		bam
-		extension
 	main:
-		mergedStats(bam, extension)
+		mergedStats(bam, "mapq")
 	emit:
 		mergedStats.out
 }
@@ -456,7 +455,7 @@ workflow mtDNA_processing {
 		merge_samples(flagStats.out.bam.groupTuple(by: 1), "mt", params.mtDNA, prepareMitoRef.out)
 		mergedStats(merge_samples.out, "markdup")
 		filterMapQ(merge_samples.out, params.mapq) 
-		mapqStats(filterMapQ.out, "mapq")
+		mapqStats(filterMapQ.out)
 		if (params.gatk) { callMtVariants(filterMapQ.out, params.mtDNA, prepareMitoRef.out) }
 	emit:
 		merge_samples.out
@@ -480,7 +479,7 @@ workflow {
 		merge_samples(flagStats.out.bam.groupTuple(by: 1), "genome", params.refseq, prepareRef.out)
 		mergedStats(merge_samples.out, "markdup")
 		filterMapQ(merge_samples.out, params.mapq)
-		mapqStats(filterMapQ.out, "mapq")
+		mapqStats(filterMapQ.out)
 		if (params.gatk) { callGenomeVariants(filterMapQ.out, params.refseq, prepareRef.out) }
 		if (params.psmc) { runPSMC(filterMapQ.out, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
 }
