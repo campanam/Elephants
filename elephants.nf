@@ -436,7 +436,7 @@ workflow mtDNA_processing {
 workflow {
 	main:
 		prepareRef(params.refseq)
-		if (params.circular_mtDNA) { prepareMitoRef(params.mtDNA) }
+		if (params.circular_mtDNA) { prepareMitoRef(params.mtDNA, params.mtDNA_ID) }
 		if (params.read_trimming) {
 			read_data = Channel.fromPath(params.samples).splitCsv(header:true).map { row -> tuple(row.Sample, row.Library, file(params.reads + row.Read1), file(params.reads + row.Read2), '@RG\\tID:' + row.Library + '\\tSM:' + row.Sample + '\\tLB:ILLUMINA\\tPL:ILLUMINA', row.Adapter1, row.Adapter2)}
 			trimReads(read_data, params.trimparams)
