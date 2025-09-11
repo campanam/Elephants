@@ -32,7 +32,7 @@ The `nextflow.config` file included with this repository contains a standard pro
 `min_uniq_mapped`: Minimum number of unique mapped reads to retain an alignment file  
 `java_options`: String of options for Java executables.  
 `markDuplicates`: Choice of "picard", "samtools" or "sambamba" for duplicate marking  
-`mapq`: Minimum mapping quality (MapQ) to retain alignment  
+`mapq`: Minimum mapping quality (MapQ) to retain alignment. Set to 0 to bypass this filter  
 `gatk`: Perform genotyping using GATK (true or false)  
 `email`: Email to send completion status. Set to "NULL" for no email.  
 `psmc`: Run PSMC analysis (true or false)  
