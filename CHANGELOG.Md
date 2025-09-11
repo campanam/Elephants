@@ -15,6 +15,8 @@ Added Picard/sambamba mark duplicates options
 Bumped BWA version  
 Bumpled zlib version  
 Added csi index option  
+Added MapQ filtering and statistics  
+Statistics outputs depth and coverage  
 
 ### Version 0.2.1  
 Final bams that do not need merging are published under the final names for simplicity  

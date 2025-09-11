@@ -187,7 +187,7 @@ process flagStats {
 	val(minmapped)
 	
 	output:
-	path("${mrkdupbam.simpleName}.stats.txt")
+	path("${mrkdupbam.simpleName}.*.txt")
 	tuple path("${mrkdupbam.simpleName}.ok.bam"), val(sample), optional: true, emit: bam
 	
 	script:
@@ -195,7 +195,9 @@ process flagStats {
 	"""
 	#!/usr/bin/env bash
 	samtools flagstat -@ ${samtools_extra_threads} ${mrkdupbam} > ${mrkdupbam.simpleName}.stats.txt
-	primary=`sed -n \'2p\' ${mrkdupbam.simpleName}.stats.txt | cut -f 1 -d \" \"` # Primary alignments
+	samtools depth -@ ${samtools_extra_threads} $mrkdupbam > ${mrkdupbam.simpleName}.depth.txt
+	samtools coverage $mrkdupbam > ${mrkdupbam.simpleName}.coverage.txt
+	primary=`sed -n \'8p\' ${mrkdupbam.simpleName}.stats.txt | cut -f 1 -d \" \"` # Primary alignments
 	dup=`sed -n \'6p\' ${mrkdupbam.simpleName}.stats.txt | cut -f 1 -d \" \"` # Primary duplicates
 	let total=\$primary-\$dup
 	if [[ \$total -ge $minmapped ]]; then ln -s $mrkdupbam ${mrkdupbam.simpleName}.ok.bam; fi
@@ -239,7 +241,7 @@ process mergedMarkDup {
 
 	// Mark duplicates for merged libraries after merging using Picard MarkDuplicates
 	
-	publishDir "$params.outdir/03_FinalBAMs", mode: 'copy'
+	publishDir "$params.outdir/03_MergedBAMs", mode: 'copy'
 	
 	input:
 	tuple path(lalnbam), val(sample)
@@ -265,31 +267,60 @@ process mergedMarkDup {
 	
 }
 
-process mergedFlagStats {
+process mergedStats {
 
 	// Calculate alignment statistics using SAMtools flagstat
 	
-	publishDir "$params.outdir/04_FinalFlagStats", mode: 'copy'
+	publishDir "$params.outdir/04_MergedFlagStats", mode: 'copy', pattern" *markdup.bam"
+	publishDir "$params.outdir/06_MapQFlagStats", mode: 'copy', pattern" *mapq.bam"
 	
 	input:
 	path mrkdupbam
 	
 	output:
-	path "${mrkdupbam.simpleName}.stats.txt"
+	path "${mrkdupbam.simpleName}.*.txt"
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
 	"""
 	samtools flagstat -@ ${samtools_extra_threads} ${mrkdupbam} > ${mrkdupbam.simpleName}.stats.txt
+	samtools depth -@ ${samtools_extra_threads} $mrkdupbam > ${mrkdupbam.simpleName}.depth.txt
+	samtools coverage $mrkdupbam > ${mrkdupbam.simpleName}.coverage.txt
 	"""
 
+}
+
+process filterMapQ {
+
+	// Filter by minimum MapQ
+	
+	publishDir "$params.outdir/04_MergedFlagStats", mode: 'copy'
+	
+	input:
+	path mrkdupbam
+	val mapq
+	
+	output:
+	path "${mrkdupbam.simpleName}.mapq.bam"
+	
+	script:
+	samtools_extra_threads = task.cpus - 1
+	if (mapq < 1)
+		"""
+		ln -s $mrkdupbam ${mrkdupbam.simpleName}.mapq.bam
+		"""
+	else
+		"""
+		samtools view -q $mapq -b -o ${mrkdupbam.simpleName}.mapq.bam $mrkdupbam
+		"""
+	
 }
 
 process callMtVariants {
 
 	// Call mtDNA variants using GATK HaplotypeCaller
 	
-	publishDir "$params.outdir/05_IndividualgVCFs/mt", mode: 'copy'
+	publishDir "$params.outdir/06_IndividualgVCFs/mt", mode: 'copy'
 	
 	input:
 	path final_bam
@@ -311,7 +342,7 @@ process callGenomeVariants {
 
 	// Call nuclear genome variants using GATK HaplotypeCaller
 	
-	publishDir "$params.outdir/05_IndividualgVCFs/genome", mode: 'copy'
+	publishDir "$params.outdir/06_IndividualgVCFs/genome", mode: 'copy'
 	
 	input:
 	path final_bam
@@ -333,7 +364,7 @@ process runPSMC {
 
 	// Generate consensus sequence and run PSMC
 	
-	publishDir "$params.outdir/06_PSMC", mode: 'copy'
+	publishDir "$params.outdir/07_PSMC", mode: 'copy'
 	
 	input:
 	path final_bam
@@ -398,6 +429,16 @@ workflow merge_samples {
 		genome = mergedMarkDup.out.genome
 }
 
+workflow mapqStats {
+	// Alias of mergedStats for MapQ-filtered data
+	take:
+		bam
+	main:
+		mergeStats(bam)
+	emit:
+		mergeStats.out
+}
+
 workflow mtDNA_processing {
 	// Left-align indels, merge and mark duplicates for mtDNA BAMs.
 	take:
@@ -411,8 +452,9 @@ workflow mtDNA_processing {
 		leftAlignIndels(alignMitoSeqs.out.bam, alignMitoSeqs.out.sample, params.mtDNA, prepareMitoRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		merge_samples(flagStats.out.bam.groupTuple(by: 1), "mt", params.mtDNA, prepareMitoRef.out)
-		mergedFlagStats(merge_samples.out.mt)
-		if (params.gatk) { callMtVariants(merge_samples.out.mt, params.mtDNA, prepareMitoRef.out) }
+		mergedStats(merge_samples.out.mt)
+		filterMapQ(merge_samples.out.mt) | mapqStats
+		if (params.gatk) { callMtVariants(filterMapQ.out, params.mtDNA, prepareMitoRef.out) }
 	emit:
 		merge_samples.out.mt
 		
@@ -433,8 +475,9 @@ workflow {
 		leftAlignIndels(alignSeqs.out.bam, alignSeqs.out.sample, params.refseq, prepareRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		merge_samples(flagStats.out.bam.groupTuple(by: 1), "genome", params.refseq, prepareRef.out)
-		mergedFlagStats(merge_samples.out.genome)
-		if (params.gatk) { callGenomeVariants(merge_samples.out.genome, params.refseq, prepareRef.out) }
-		if (params.psmc) { runPSMC(merge_samples.out.genome, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
+		mergedStats(merge_samples.out.genome)
+		filterMapQ(merge_samples.out.genome) | mapqStats
+		if (params.gatk) { callGenomeVariants(filterMapQ.out, params.refseq, prepareRef.out) }
+		if (params.psmc) { runPSMC(filterMapQ.out, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
 }
 	
