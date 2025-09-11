@@ -178,9 +178,9 @@ process markDuplicates {
 
 process flagStats {
 
-	// Calculate alignment statistics for unmerged library files using SAMtools flagstat
+	// Calculate alignment statistics for unmerged library files using SAMtools
 	
-	publishDir "$params.outdir/02_LibraryFlagStats", mode: 'copy', pattern: '*.stats.txt'
+	publishDir "$params.outdir/02_LibraryStats", mode: 'copy', pattern: '*.stats.txt'
 	
 	input:
 	tuple path(mrkdupbam), val(sample)
