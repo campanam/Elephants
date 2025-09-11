@@ -453,7 +453,7 @@ workflow mtDNA_processing {
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		merge_samples(flagStats.out.bam.groupTuple(by: 1), "mt", params.mtDNA, prepareMitoRef.out)
 		mergedStats(merge_samples.out.mt)
-		filterMapQ(merge_samples.out.mt) | mapqStats
+		filterMapQ(merge_samples.out.mt, params.mapq) | mapqStats
 		if (params.gatk) { callMtVariants(filterMapQ.out, params.mtDNA, prepareMitoRef.out) }
 	emit:
 		merge_samples.out.mt
@@ -476,7 +476,7 @@ workflow {
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		merge_samples(flagStats.out.bam.groupTuple(by: 1), "genome", params.refseq, prepareRef.out)
 		mergedStats(merge_samples.out.genome)
-		filterMapQ(merge_samples.out.genome) | mapqStats
+		filterMapQ(merge_samples.out.genome, params.mapq) | mapqStats
 		if (params.gatk) { callGenomeVariants(filterMapQ.out, params.refseq, prepareRef.out) }
 		if (params.psmc) { runPSMC(filterMapQ.out, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
 }
