@@ -420,14 +420,16 @@ workflow mtDNA_processing {
 	take:
 		alignments
 		sample
-		mtDNA
-		mtDNA_files
+		library
+		rg
 	main:
-		leftAlignIndels(alignments, sample, mtDNA, mtDNA_files) | markDuplicates
+		prepareMitoRef(params.mtDNA, params.mtDNA_ID)
+		alignMitoSeqs(alignments, sample, params.mtDNA, prepareMitoRef.out)
+		leftAlignIndels(alignMitoSeqs.out.bam, alignMitoSeqs.out.sample, params.mtDNA, prepareMitoRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		mergeSampleBAM(flagStats.out.bam.groupTuple(by: 1))
-		mergedLeftAlignIndels(mergeSampleBAM.out.merged, mergeSampleBAM.out.sample, mtDNA, mtDNA_files) | mergedMarkDup | mergedFlagStats
-		if (params.gatk) { callMtVariants(mergeSampleBAM.out.mt.mix(mergedMarkDup.out), mtDNA, mtDNA_files) }
+		mergedLeftAlignIndels(mergeSampleBAM.out.merged, mergeSampleBAM.out.sample, params.mtDNA, prepareMitoRef.out) | mergedMarkDup | mergedFlagStats
+		if (params.gatk) { callMtVariants(mergeSampleBAM.out.mt.mix(mergedMarkDup.out), params.mtDNA, prepareMitoRef.out) }
 	emit:
 		final_bams = mergedMarkDup.out
 		
@@ -436,7 +438,6 @@ workflow mtDNA_processing {
 workflow {
 	main:
 		prepareRef(params.refseq)
-		if (params.circular_mtDNA) { prepareMitoRef(params.mtDNA, params.mtDNA_ID) }
 		if (params.read_trimming) {
 			read_data = Channel.fromPath(params.samples).splitCsv(header:true).map { row -> tuple(row.Sample, row.Library, file(params.reads + row.Read1), file(params.reads + row.Read2), '@RG\\tID:' + row.Library + '\\tSM:' + row.Sample + '\\tLB:ILLUMINA\\tPL:ILLUMINA', row.Adapter1, row.Adapter2)}
 			trimReads(read_data, params.trimparams)
@@ -445,10 +446,7 @@ workflow {
 			read_data = Channel.fromPath(params.samples).splitCsv(header:true).map { row -> tuple(row.Sample, row.Library, file(params.reads + row.Read1), file(params.reads + row.Read2), '@RG\\tID:' + row.Library + '\\tSM:' + row.Sample + '\\tLB:ILLUMINA\\tPL:ILLUMINA')}
 			alignSeqs(read_data, params.refseq, prepareRef.out)
 		}
-		if (params.circular_mtDNA) {
-			alignMitoSeqs(alignSeqs.out.bam, alignSeqs.out.sample, alignSeqs.out.library, alignSeqs.out.rg, params.mtDNA, prepareMitoRef.out)
-			mtDNA_processing(alignMitoSeqs.out.bam, alignMitoSeqs.out.sample, params.mtDNA, prepareMitoRef.out)
-		} 
+		if (params.circular_mtDNA) { mtDNA_processing(alignSeqs.out.bam, alignSeqs.out.sample, alignSeqs.out.library, alignSeqs.out.rg) } 
 		leftAlignIndels(alignSeqs.out.bam, alignSeqs.out.sample, params.refseq, prepareRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		mergeSampleBAM(flagStats.out.bam.groupTuple(by: 1))
