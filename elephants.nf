@@ -308,7 +308,7 @@ process filterMapQ {
 	samtools_extra_threads = task.cpus - 1
 	if (mapq < 1)
 		"""
-		ln -s $mrkdupbam ${mrkdupbam.simpleName}.mapq.bam
+		ln -s ${mrkdupbam} ${mrkdupbam.simpleName}.mapq.bam
 		"""
 	else
 		"""
