@@ -402,17 +402,17 @@ workflow.onComplete {
 	}
 }
 
-workflow mergedLeftAlignIndels {
+workflow merge_samples {
 	// Left-align indels of merged data
 	take:
-		alignments
-		sample
+		samples
 		refseq
 		refseq_files
 	main:
-		leftAlignIndels(alignments, sample, refseq, refseq_files)
+		mergeSampleBAM(samples)
+		leftAlignIndels(mergeSampleBAM.out.merged, mergeSampleBAM.out.sample, refseq, refseq_files) | mergedMarkDup | mergedFlagStats
 	emit:
-		leftAlignIndels.out
+		genome = mergeSampleBAM.out.genome
 }
 
 workflow mtDNA_processing {
@@ -427,8 +427,7 @@ workflow mtDNA_processing {
 		alignMitoSeqs(alignments, sample, library, rg, params.mtDNA, prepareMitoRef.out)
 		leftAlignIndels(alignMitoSeqs.out.bam, alignMitoSeqs.out.sample, params.mtDNA, prepareMitoRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
-		mergeSampleBAM(flagStats.out.bam.groupTuple(by: 1))
-		mergedLeftAlignIndels(mergeSampleBAM.out.merged, mergeSampleBAM.out.sample, params.mtDNA, prepareMitoRef.out) | mergedMarkDup | mergedFlagStats
+		merge_samples(flagStats.out.bam.groupTuple(by: 1), params.mtDNA, prepareMitoRef.out)
 		if (params.gatk) { callMtVariants(mergeSampleBAM.out.mt.mix(mergedMarkDup.out), params.mtDNA, prepareMitoRef.out) }
 	emit:
 		final_bams = mergedMarkDup.out
@@ -449,9 +448,7 @@ workflow {
 		if (params.circular_mtDNA) { mtDNA_processing(alignSeqs.out.bam, alignSeqs.out.sample, alignSeqs.out.library, alignSeqs.out.rg) } 
 		leftAlignIndels(alignSeqs.out.bam, alignSeqs.out.sample, params.refseq, prepareRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
-		mergeSampleBAM(flagStats.out.bam.groupTuple(by: 1))
-		mergedLeftAlignIndels(mergeSampleBAM.out.merged, mergeSampleBAM.out.sample, params.refseq, prepareRef.out) | mergedMarkDup | mergedFlagStats
-		final_bams = mergeSampleBAM.out.genome.mix(mergedMarkDup.out)
+		final_bams = merge_samples.out.genome.mix(mergedMarkDup.out)
 		if (params.gatk) { callGenomeVariants(final_bams, params.refseq, prepareRef.out) }
 		if (params.psmc) { runPSMC(final_bams, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
 }
