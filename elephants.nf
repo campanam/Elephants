@@ -414,7 +414,7 @@ workflow mtDNA_processing {
 		mergedFlagStats(merge_samples.out.mt)
 		if (params.gatk) { callMtVariants(merge_samples.out.mt, params.mtDNA, prepareMitoRef.out) }
 	emit:
-		final_bams = final_mt_bams
+		merge_samples.out.mt
 		
 }
 
