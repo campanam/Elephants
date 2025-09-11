@@ -38,7 +38,7 @@ process prepareMitoRef {
 	val mtDNA_ID
 	
 	output:
-	path "${mtDNA.baseName}*{_500.fasta,amb,ann,bwt,pac,sa,fai,dict}"
+	path "${mtDNA.baseName}*{_500.fasta,amb,ann,bwt,pac,sa,fai,dict,elongated}"
 	
 	"""
 	$circulargenerator -e 500 -i ${mtDNA} -s ${mtDNA_ID}
