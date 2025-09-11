@@ -424,7 +424,7 @@ workflow mtDNA_processing {
 		rg
 	main:
 		prepareMitoRef(params.mtDNA, params.mtDNA_ID)
-		alignMitoSeqs(alignments, sample, params.mtDNA, prepareMitoRef.out)
+		alignMitoSeqs(alignments, sample, library, rg, params.mtDNA, prepareMitoRef.out)
 		leftAlignIndels(alignMitoSeqs.out.bam, alignMitoSeqs.out.sample, params.mtDNA, prepareMitoRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		mergeSampleBAM(flagStats.out.bam.groupTuple(by: 1))
