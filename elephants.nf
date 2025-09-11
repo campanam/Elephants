@@ -279,7 +279,7 @@ process mergedStats {
 	val extension
 	
 	output:
-	path "${mrkdupbam.simpleName}.*.txt"
+	path "${mrkdupbam.simpleName}.${extension}.*.txt"
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
