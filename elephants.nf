@@ -478,7 +478,7 @@ workflow {
 		leftAlignIndels(alignSeqs.out.bam, alignSeqs.out.sample, params.refseq, prepareRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		merge_samples(flagStats.out.bam.groupTuple(by: 1), "genome", params.refseq, prepareRef.out)
-		mergedStats(merge_samples.out)
+		mergedStats(merge_samples.out, "markdup")
 		filterMapQ(merge_samples.out, params.mapq)
 		mapqStats(filterMapQ.out, "mapq")
 		if (params.gatk) { callGenomeVariants(filterMapQ.out, params.refseq, prepareRef.out) }
