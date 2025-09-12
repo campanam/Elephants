@@ -115,7 +115,7 @@ process alignMitoSeqs {
 	bwa aln -t ${task.cpus} ${mtDNA.baseName}_500.fasta ${library}.2.unmapped.fastq.gz > ${library}.2.circ.sai
 	bwa sampe -r '${rg}' ${mtDNA.baseName}_500.fasta ${library}.1.circ.sai ${library}.2.circ.sai ${library}.1.unmapped.fastq.gz ${library}.2.unmapped.fastq.gz > ${library}.circ.sam
 	$realignsamfile -e 500 -i ${library}.circ.sam -r ${mtDNA}
-	samtools sort -@ ${samtools_extra_threads} -n ${library}.circ_realigned.bam | samtools fixmate -@ ${samtools_extra_threads} -rm -z all - - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_mt.bam -
+	samtools fixmate -@ ${samtools_extra_threads} -rm ${library}.circ_realigned.bam - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_mt.bam -
 	"""
 }
 
@@ -140,7 +140,6 @@ process leftAlignIndels {
 		"""
 	else
 		"""
-		$picard BuildBamIndex I=${rg_bam}
 		$gatk LeftAlignIndels -R ${refseq} -I $rg_bam -O ${rg_bam.simpleName}.realn.bam
 		"""
 
@@ -170,7 +169,7 @@ process markDuplicates {
 		"""
 	else
 		"""
-		$picard MarkDuplicates I=${lalnbam} O=${lalnbam.simpleName}.markdup.bam M=${lalnbam.simpleName}.markdup.txt MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000
+		$picard MarkDuplicates I=${lalnbam} O=${lalnbam.simpleName}.markdup.bam M=${lalnbam.simpleName}.markdup.txt MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000 VALIDATION_STRINGENCY=LENIENT
 		"""
 	
 }
