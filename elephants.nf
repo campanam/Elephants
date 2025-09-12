@@ -115,7 +115,7 @@ process alignMitoSeqs {
 	bwa aln -t ${task.cpus} ${mtDNA.baseName}_500.fasta ${library}.2.unmapped.fastq.gz > ${library}.2.circ.sai
 	bwa sampe -r '${rg}' ${mtDNA.baseName}_500.fasta ${library}.1.circ.sai ${library}.2.circ.sai ${library}.1.unmapped.fastq.gz ${library}.2.unmapped.fastq.gz > ${library}.circ.sam
 	$realignsamfile -e 500 -i ${library}.circ.sam -r ${mtDNA}
-	samtools fixmate -@ ${samtools_extra_threads} -rm ${library}.circ_realigned.bam - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_mt.bam -
+	samtools sort -@ ${samtools_extra_threads} -n ${library}.circ_realigned.bam | samtools fixmate -@ ${samtools_extra_threads} -rm - - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_mt.bam -
 	"""
 }
 
