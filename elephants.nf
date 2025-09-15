@@ -1,29 +1,25 @@
 #!/usr/bin/env nextflow
 
-/* Elephant Analysis Pipeline version 0.2.1
-Michael G. Campana, 2023
-Smithsonian's National Zoo and Conservation Biology Institute
+/* Elephant Analysis Pipeline version 0.3.0
+Michael G. Campana, 2023-2025
+Smithsonian\'s National Zoo and Conservation Biology Institute
 
 The software is made available under the Smithsonian Institution terms of use (https://www.si.edu/termsofuse). */
 
 gatk = 'gatk --java-options "' + params.java_options + '" ' // Simplify gatk command line
+picard = "picard " + params.java_options
+circulargenerator = "circulargenerator " + params.java_options
+realignsamfile = "realignsamfile " + params.java_options
 
-Channel
-	.fromPath(params.samples)
-	.splitCsv(header:true)
-	.map { row -> tuple(row.Sample, row.Library, file(params.reads + row.Read1), file(params.reads + row.Read2), '@RG\\tID:' + row.Library + '\\tSM:' + row.Sample + '\\tLB:ILLUMINA\\tPL:ILLUMINA') }
-	.set { readpairs_ch }
-
-process buildRef {
+process prepareRef {
 	
 	// Prepare nuclear reference sequence
 	
 	input:
-	path refseq from params.refseq
+	path refseq
 	
 	output:
-	path "${refseq.baseName}.*" into ref_build_ch // Channel to find these files again
-	path "${refseq.baseName}*.{fai,dict}" into fai_refseq_laln_ch // Channel for fai file for LeftAlignIndels
+	path "${refseq.baseName}*.{amb,ann,bwt,pac,sa,fai,dict}"
 
 	"""
 	bwa index ${refseq}
@@ -33,325 +29,306 @@ process buildRef {
 
 }
 
-process buildMitoRef {
+process prepareMitoRef {
 	
-	// Prepare mitochondrial reference sequence for BWA
+	// Prepare mitochondrial reference sequence for BWA/CircularMapper
 	
 	input:
-	path mtDNA from params.mtDNA
+	path mtDNA
+	val mtDNA_ID
 	
 	output:
-	path "${mtDNA.baseName}.*" into ref_mtDNA_ch // Channel to find alignment files again
-	path "${mtDNA.baseName}*.{fai,dict}" into fai_mtDNA_laln_ch // Channel for fai file for LeftAlignIndels
+	path "${mtDNA.baseName}*{_500.fasta,amb,ann,bwt,pac,sa,fai,dict,elongated}"
 	
 	"""
-	bwa index ${mtDNA}
+	$circulargenerator -e 500 -i ${mtDNA} -s ${mtDNA_ID}
+	bwa index ${mtDNA.baseName}_500.fasta
 	samtools faidx ${mtDNA}
 	samtools dict ${mtDNA} > ${mtDNA.baseName}.dict
 	"""
 
 }
 
-process alignSeqs {
+process trimReads {
 
-	// Align sequences using BWA and convert unmapped reads to FASTQ for alignment to mtDNA
+	// Trim reads using AdapterRemoval v2
 	
 	input:
-	path refseq from params.refseq
-	path "*" from ref_build_ch
-	tuple val(sample), val(library), path(reads1), path(reads2), val(rg) from readpairs_ch
+	tuple val(sample), val(library), path(reads1), path(reads2), val(rg), val(adapter1), val(adapter2)
+	val(trimparams)
 	
 	output:
-	tuple file("${library}_vs_genome.bam"), val(sample) into raw_bam_ch
-	tuple val(library), path("${library}.1.unmapped.fastq.gz"), path("${library}.2.unmapped.fastq.gz"), val(sample), val(rg) into mtDNA_fastq_ch
+	tuple val(sample), val(library), path("${library}_R1.trunc.fastq.gz"), path("${library}_R2.trunc.fastq.gz"), val(rg)
+	
+	"""
+	AdapterRemoval --file1 $reads1 --file2 $reads2 --basename $library --adapter1 $adapter1 --adapter2 $adapter2 --gzip $trimparams
+	mv ${library}.pair1.truncated.gz ${library}_R1.trunc.fastq.gz
+	mv ${library}.pair2.truncated.gz ${library}_R2.trunc.fastq.gz
+	"""
 
+}
+
+process alignSeqs {
+
+	// Align sequences using BWA
+	
+	input:
+	tuple val(sample), val(library), path(reads1), path(reads2), val(rg)
+	path refseq
+	path "*"
+	
+	output:
+	path("${library}_vs_genome.bam"), emit: bam
+	val(sample), emit: sample
+	val(library), emit: library
+	val(rg), emit: rg
+	
 	script:
 	samtools_extra_threads = task.cpus - 1
 	"""
-	bwa mem -t ${task.cpus} -R '${rg}' ${refseq} ${reads1} ${reads2} | samtools view -@ ${samtools_extra_threads} -b -o ${library}.bam -
-	samtools view -@ ${samtools_extra_threads} -b -F 4 ${library}.bam | samtools fixmate -@ ${samtools_extra_threads} -r -m - - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_genome.bam -
-	samtools view -@ ${samtools_extra_threads} -b -f 4 ${library}.bam | samtools sort -@ ${samtools_extra_threads} -o ${library}.unmapped.bam -
-	samtools collate -@ ${samtools_extra_threads} -u -O ${library}.unmapped.bam | \\
-	samtools fastq -@ ${samtools_extra_threads} -1 ${library}.1.unmapped.fastq -2 ${library}.2.unmapped.fastq -0 /dev/null -s /dev/null
-	gzip ${library}.*.unmapped.fastq
+	bwa mem -t ${task.cpus} -R '${rg}' ${refseq} ${reads1} ${reads2} | samtools fixmate -@ ${samtools_extra_threads} -m - - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_genome.bam -
 	"""
 	
 }
 
 process alignMitoSeqs {
 
-	// Align mitochondrial sequences using BWA
+	// Convert unmapped reads to FASTQ for alignment to mtDNA and align mitochondrial sequences using BWA
 	
 	input:
-	tuple val(library), path(mtfastq1), path(mtfastq2), val(sample), val(rg) from mtDNA_fastq_ch
-	file "*" from ref_mtDNA_ch
-	path mtDNA from params.mtDNA
+	path(bam)
+	val(sample)
+	val(library)
+	val(rg)
+	path mtDNA
+	path "*"
 	
 	output:
-	tuple path("${library}_vs_mt.bam"), val(sample) into raw_mito_bam_ch
+	path("${library}_vs_mt.bam"), emit: bam
+	val(sample), emit: sample
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
 	"""
-	bwa mem -t ${task.cpus} -R '${rg}' ${mtDNA} ${mtfastq1} ${mtfastq2} | samtools view -@ ${samtools_extra_threads} -b -F 4 - | samtools fixmate -@ ${samtools_extra_threads} -r -m - - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_mt.bam -
+	samtools view -@ ${samtools_extra_threads} -b -f 4 ${bam} | samtools collate -@ ${samtools_extra_threads} -u -O - | samtools fastq -@ ${samtools_extra_threads} -1 ${library}.1.unmapped.fastq.gz -2 ${library}.2.unmapped.fastq.gz -0 /dev/null -s /dev/null
+	bwa aln -t ${task.cpus} ${mtDNA.baseName}_500.fasta ${library}.1.unmapped.fastq.gz > ${library}.1.circ.sai
+	bwa aln -t ${task.cpus} ${mtDNA.baseName}_500.fasta ${library}.2.unmapped.fastq.gz > ${library}.2.circ.sai
+	bwa sampe -r '${rg}' ${mtDNA.baseName}_500.fasta ${library}.1.circ.sai ${library}.2.circ.sai ${library}.1.unmapped.fastq.gz ${library}.2.unmapped.fastq.gz > ${library}.circ.sam
+	$realignsamfile -e 500 -i ${library}.circ.sam -r ${mtDNA}
+	samtools fixmate -@ ${samtools_extra_threads} -rm ${library}.circ_realigned.bam - | samtools sort -@ ${samtools_extra_threads} -o ${library}_vs_mt.bam -
 	"""
 }
-
-raw_bam_ch2 = raw_bam_ch.mix(raw_mito_bam_ch)
 
 process leftAlignIndels {
 
 	// Left Align Indels using GATK4 LeftAlignIndels
 	
 	input:
-	tuple path(rgbam), val(sample) from raw_bam_ch2
-	path mtDNA from params.mtDNA
-	path mtDNA_fai from fai_mtDNA_laln_ch
-	path genome from params.refseq
-	path genome_fai from fai_refseq_laln_ch
+	path(rg_bam)
+	val(sample)
+	path refseq
+	path "*"
 	
 	output:
-	tuple path("${rgbam.simpleName}.laln.bam"), val(sample) into laln_bam_ch
+	tuple path("${rg_bam.simpleName}.realn.bam"), val(sample)
 	
 	script:
-	 // Need to identify appropriate reference sequence for alignment
-	refid = rgbam.simpleName.split('_vs_')[1]
-	switch(refid) {
-		case 'mt':
-			laln_reference = mtDNA;
-			break;
-		case 'genome':
-			laln_reference = genome;
-			break;
-	}
-	"""
-	$gatk LeftAlignIndels -I ${rgbam} -O ${rgbam.simpleName}.laln.bam -R ${laln_reference}
-	"""
-	
-}	
+	if ( params.csi )
+		"""
+		samtools index -c ${rg_bam}
+		$gatk LeftAlignIndels -R ${refseq} -I $rg_bam -O ${rg_bam.simpleName}.realn.bam --create-output-bam-index false
+		"""
+	else
+		"""
+		$gatk LeftAlignIndels -R ${refseq} -I $rg_bam -O ${rg_bam.simpleName}.realn.bam
+		"""
 
-process markDup {
+}
+
+process markDuplicates {
 
 	// Initial marking of duplicates for unmerged library files
 	
 	publishDir "$params.outdir/01_LibraryBAMs", mode: 'copy'
 	
 	input:
-	tuple path(lalnbam), val(sample) from laln_bam_ch
-	val java_options from params.java_options
+	tuple path(lalnbam), val(sample)
 	
 	output:
-	tuple path("${lalnbam.simpleName}.mrkdup.bam"), val(sample) into mrkdup_bam_ch
+	tuple path("${lalnbam.simpleName}.markdup.bam"), val(sample)
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
-	"""
-	samtools markdup -@ ${samtools_extra_threads} ${lalnbam} ${lalnbam.simpleName}.mrkdup.bam
-	"""
+	if ( params.markDuplicates == "sambamba" )
+		"""
+		sambamba markdup ${lalnbam} ${lalnbam.simpleName}.markdup.bam
+		"""
+	else if ( params.markDuplicates == "samtools" )
+		"""
+		samtools markdup -@ ${samtools_extra_threads} ${lalnbam} ${lalnbam.simpleName}.markdup.bam
+		"""
+	else
+		"""
+		$picard MarkDuplicates I=${lalnbam} O=${lalnbam.simpleName}.markdup.bam M=${lalnbam.simpleName}.markdup.txt MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000 VALIDATION_STRINGENCY=LENIENT
+		"""
 	
 }
 
 process flagStats {
 
-	// Calculate alignment statistics for unmerged library files using SAMtools flagstat
+	// Calculate alignment statistics for unmerged library files using SAMtools
 	
-	publishDir "$params.outdir/02_LibraryFlagStats", mode: 'copy', pattern: '*.stats.txt'
+	publishDir "$params.outdir/02_LibraryStats", mode: 'copy', pattern: '*.stats.txt'
 	
 	input:
-	tuple path(mrkdupbam), val(sample) from mrkdup_bam_ch
-	val(minmapped) from params.min_uniq_mapped
+	tuple path(mrkdupbam), val(sample)
+	val(minmapped)
 	
 	output:
-	path("${mrkdupbam.simpleName}.stats.txt")
-	tuple path("${mrkdupbam.simpleName}.trim.bam"), val(sample) optional true into modern_bam_ch
+	path("${mrkdupbam.simpleName}.*.txt")
+	tuple path("${mrkdupbam.simpleName}.ok.bam"), val(sample), optional: true, emit: bam
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
 	"""
 	#!/usr/bin/env bash
 	samtools flagstat -@ ${samtools_extra_threads} ${mrkdupbam} > ${mrkdupbam.simpleName}.stats.txt
-	primary=`sed -n \'2p\' ${mrkdupbam.simpleName}.stats.txt | cut -f 1 -d \" \"` # Primary alignments
+	samtools depth -@ ${samtools_extra_threads} $mrkdupbam > ${mrkdupbam.simpleName}.depth.txt
+	samtools coverage $mrkdupbam > ${mrkdupbam.simpleName}.coverage.txt
+	primary=`sed -n \'8p\' ${mrkdupbam.simpleName}.stats.txt | cut -f 1 -d \" \"` # Primary alignments
 	dup=`sed -n \'6p\' ${mrkdupbam.simpleName}.stats.txt | cut -f 1 -d \" \"` # Primary duplicates
 	let total=\$primary-\$dup
-	if [[ \$total -ge $minmapped ]]; then ln $mrkdupbam ${mrkdupbam.simpleName}.trim.bam; fi
+	if [[ \$total -ge $minmapped ]]; then ln -s $mrkdupbam ${mrkdupbam.simpleName}.ok.bam; fi
 	"""
 	
 }
-
-sample_bam_ch = modern_bam_ch.groupTuple(by: 1) // Get a channel of unique samples matched with their file paths
 
 process mergeSampleBAM {
 
 	// Merge libraries by their sample IDs using SAMtools merge
 	
-	publishDir "$params.outdir/03_FinalBAMs", mode: 'copy', pattern: "*_merged_vs_*.mrkdup.bam"
+	publishDir "$params.outdir/03_FinalBAMs", mode: 'copy', pattern: "*_merged_vs_*.markdup.bam"
 	
 	input:
-	tuple path(bam), val(sample) from sample_bam_ch
+	tuple path(bam), val(sample)
+	val(marker)
 	
 	output:
-	path "${sample}_merged*.bam" // Make sure there is some output
-	path "${sample}_merged*.merged.bam" optional true into merged_bam_ch // Send samples that need merging to merging processes
-	path "${sample}_merged_vs_genome.mrkdup.bam" optional true into final_bam_skip_ch // Skip unnecessary merging steps
-	path "${sample}_merged_vs_mt.mrkdup.bam" optional true into final_mt_skip_ch // Skip unnecessary merging steps
+	path "${sample}_vs_${marker}_merged.bam", emit: bam
+	val(sample), emit: sample
 	
 	script:
-	samtools_extra_threads = task.cpus -1 
-	// First make sure that an input file exists for each type of alignment since could have been removed earlier. If no alignments exist, the whole sample should have been removed previously.
-	mtbamlist = ""
-	genomebamlist = ""
-	mtbams = 0 // Count of mt bams
-	genomebams = 0 // Count of genome bams
+	samtools_extra_threads = task.cpus - 1
+	bams = 0
+	bamlist = ""
 	for (i in bam) {
-		category = i.simpleName.split("_vs_")[1]
-		if (category == "mt") {
-			mtbams++
-			mtbamlist = mtbamlist + " " + i
-		} else {
-			genomebams++
-			genomebamlist = genomebamlist + " " + i
-		}
+		bams++
+		bamlist = bamlist + " " + i
 	}
-	if (genomebams == 0 && mtbams == 1)
+	if (bams == 1) // Skip merging single libraries
 		"""
-		ln -s $mtbamlist ${sample}_merged_vs_mt.mrkdup.bam
-		"""
-	 else if (genomebams == 0 && mtbams > 1)
-		"""
-		samtools merge -@ ${samtools_extra_threads} ${sample}_merged_vs_mt.merged.bam $mtbamlist
-		"""
-	else if (mtbams == 0 && genomebams == 1)
-		"""
-		ln -s $genomebamlist ${sample}_merged_vs_genome.mrkdup.bam
-		"""
-	else if (mtbams == 0 && genomebams > 1)
-		"""	
-		samtools merge -@ ${samtools_extra_threads} ${sample}_merged_vs_genome.merged.bam $genomebamlist
-		"""
-	else if (mtbams == 1 && genomebams > 1) 
-		"""
-		ln -s $mtbamlist ${sample}_merged_vs_mt.mrkdup.bam
-		samtools merge -@ ${samtools_extra_threads} ${sample}_merged_vs_genome.merged.bam $genomebamlist
-		"""
-	else if (mtbams > 1 && genomebams == 1)
-		"""
-		ln -s $genomebamlist ${sample}_merged_vs_genome.mrkdup.bam
-		samtools merge -@ ${samtools_extra_threads} ${sample}_merged_vs_mt.merged.bam $mtbamlist
-		"""
-	else if (mtbams == 1 && genomebams == 1)
-		"""
-		ln -s $mtbamlist ${sample}_merged_vs_mt.mrkdup.bam
-		ln -s $genomebamlist ${sample}_merged_vs_genome.mrkdup.bam
+		ln -s $bamlist ${sample}_vs_${marker}_merged.bam
 		"""
 	else
 		"""
-		samtools merge -@ ${samtools_extra_threads} ${sample}_merged_vs_mt.merged.bam $mtbamlist
-		samtools merge -@ ${samtools_extra_threads} ${sample}_merged_vs_genome.merged.bam $genomebamlist
+		samtools merge -@ ${samtools_extra_threads} -o ${sample}_vs_${marker}_merged.bam $bamlist
 		"""
 } 
-
-// Flatten array if both mt and genome samples need merging
-merged_bam_ch2 = merged_bam_ch.flatten()
-
-
-process mergedLeftAlignIndels {
-
-	// Left align indels for merged libraries
-	
-	input:
-	path mrgbam from merged_bam_ch2
-	path mtDNA from params.mtDNA
-	path mtDNA_fai from fai_mtDNA_laln_ch
-	path genome from params.refseq
-	path genome_fai from fai_refseq_laln_ch
-	
-	output:
-	file "${mrgbam.simpleName}.laln.bam" into laln_merged_bam_ch
-	
-	script:
-	 // Need to identify appropriate reference sequence for alignment
-	refid = mrgbam.simpleName.split('_vs_')[1]
-	switch(refid) {
-		case 'mt':
-			laln_reference = mtDNA;
-			break;
-		case 'genome':
-			laln_reference = genome;
-			break;
-	}
-	"""
-	$gatk LeftAlignIndels -I ${mrgbam} -O ${mrgbam.simpleName}.laln.bam -R ${laln_reference}
-	"""
-
-}
 
 process mergedMarkDup {
 
 	// Mark duplicates for merged libraries after merging using Picard MarkDuplicates
 	
-	publishDir "$params.outdir/03_FinalBAMs", mode: 'copy'
+	publishDir "$params.outdir/03_MergedBAMs", mode: 'copy'
 	
 	input:
-	path laln_mrg_bam from laln_merged_bam_ch
-	val java_options from params.java_options
+	tuple path(lalnbam), val(sample)
+	val(marker)
 	
 	output:
-	path "${laln_mrg_bam.simpleName}.mrkdup.bam" into mrg_mrkdup_bam_ch
-	path "${laln_mrg_bam.simpleName.split('_vs_')[0]}_vs_mt.mrkdup.bam" optional true into final_mt_ch
-	path "${laln_mrg_bam.simpleName.split('_vs_')[0]}_vs_genome.mrkdup.bam" optional true into final_bam_ch
-	
+	path "${sample}_vs_${marker}_merged.markdup.bam"
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
-	"""
-	samtools markdup -@ ${samtools_extra_threads} ${laln_mrg_bam} ${laln_mrg_bam.simpleName}.mrkdup.bam
-	"""
-
+	if ( params.markDuplicates == "sambamba" )
+		"""
+		sambamba markdup ${lalnbam} ${lalnbam.simpleName}.markdup.bam
+		"""
+	else if ( params.markDuplicates == "samtools" )
+		"""
+		samtools markdup -@ ${samtools_extra_threads} ${lalnbam} ${lalnbam.simpleName}.markdup.bam
+		"""
+	else
+		"""
+		$picard MarkDuplicates I=${lalnbam} O=${lalnbam.simpleName}.markdup.bam M=${lalnbam.simpleName}.markdup.txt MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000
+		"""
+	
 }
 
-process mergedFlagStats {
+process mergedStats {
 
 	// Calculate alignment statistics using SAMtools flagstat
 	
-	publishDir "$params.outdir/04_FinalFlagStats", mode: 'copy'
+	publishDir "$params.outdir/04_MergedStats", mode: 'copy', pattern: "*.markdup.stats.txt"
+	publishDir "$params.outdir/06_MapQStats", mode: 'copy', pattern: "*.mapq.stats.txt"
 	
 	input:
-	path mrkdupbam from mrg_mrkdup_bam_ch
+	path mrkdupbam
+	val extension
 	
 	output:
-	path "${mrkdupbam.simpleName}.stats.txt"
+	path "${mrkdupbam.simpleName}.${extension}.*.txt"
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
 	"""
-	samtools flagstat -@ ${samtools_extra_threads} ${mrkdupbam} > ${mrkdupbam.simpleName}.stats.txt
+	samtools flagstat -@ ${samtools_extra_threads} ${mrkdupbam} > ${mrkdupbam.simpleName}.${extension}.stats.txt
+	samtools depth -@ ${samtools_extra_threads} $mrkdupbam > ${mrkdupbam.simpleName}.${extension}.depth.txt
+	samtools coverage $mrkdupbam > ${mrkdupbam.simpleName}.${extension}.coverage.txt
 	"""
 
 }
 
-// Add different channels together
-final_mt_ch2 = final_mt_ch.mix(final_mt_skip_ch)
-final_bam_ch2 = final_bam_ch.mix(final_bam_skip_ch)
-final_bam_ch2.unique().into { final_bam_ch_Var;final_bam_ch_PSMC }
+process filterMapQ {
 
+	// Filter by minimum MapQ
+	
+	publishDir "$params.outdir/04_MergedFlagStats", mode: 'copy'
+	
+	input:
+	path mrkdupbam
+	val mapq
+	
+	output:
+	path "${mrkdupbam.simpleName}.mapq.bam"
+	
+	script:
+	samtools_extra_threads = task.cpus - 1
+	if (mapq < 1)
+		"""
+		ln -s ${mrkdupbam} ${mrkdupbam.simpleName}.mapq.bam
+		"""
+	else
+		"""
+		samtools view -q $mapq -b -o ${mrkdupbam.simpleName}.mapq.bam $mrkdupbam
+		"""
+	
+}
 
 process callMtVariants {
 
 	// Call mtDNA variants using GATK HaplotypeCaller
 	
-	publishDir "$params.outdir/05_IndividualgVCFs/mt", mode: 'copy'
+	publishDir "$params.outdir/06_IndividualgVCFs/mt", mode: 'copy'
 	
 	input:
-	path final_bam from final_mt_ch2.unique()
-	path mtDNA from params.mtDNA
-	path mtDNA_fai from fai_mtDNA_laln_ch
+	path final_bam
+	path mtDNA
+	path "*"
 	
 	output:
-	path "${final_bam.simpleName}.vcf.gz" into gVCF_mt_ch
-	path "${final_bam.simpleName}.vcf.gz.tbi" into gVCF_mt_index_ch
-	
-	when:
-	params.gatk == true
+	path "${final_bam.simpleName}.vcf.gz"
+	path "${final_bam.simpleName}.vcf.gz.tbi"
 	
 	"""
 	samtools index $final_bam
@@ -364,19 +341,16 @@ process callGenomeVariants {
 
 	// Call nuclear genome variants using GATK HaplotypeCaller
 	
-	publishDir "$params.outdir/05_IndividualgVCFs/genome", mode: 'copy'
+	publishDir "$params.outdir/06_IndividualgVCFs/genome", mode: 'copy'
 	
 	input:
-	path final_bam from final_bam_ch_Var
-	path genome from params.refseq
-	path genome_fai from fai_refseq_laln_ch
+	path final_bam
+	path genome
+	path "*"
 	
 	output:
-	path "${final_bam.simpleName}.vcf.gz" into gVCF_genome_ch
-	path "${final_bam.simpleName}.vcf.gz.tbi" into gVCF_genome_index_ch
-	
-	when:
-	params.gatk == true
+	path "${final_bam.simpleName}.vcf.gz"
+	path "${final_bam.simpleName}.vcf.gz.tbi"
 	
 	"""
 	samtools index $final_bam
@@ -389,18 +363,18 @@ process runPSMC {
 
 	// Generate consensus sequence and run PSMC
 	
-	publishDir "$params.outdir/06_PSMC", mode: 'copy'
+	publishDir "$params.outdir/07_PSMC", mode: 'copy'
 	
 	input:
-	path final_bam from final_bam_ch_PSMC
-	path genome from params.refseq
-	path genome_fai from fai_refseq_laln_ch
-	val psmc_mpileup_opts from params.psmc_mpileup_opts
-	val psmc_vcfutils_opts from params.psmc_vcfutils_opts
-	val psmc_psmcfa_opts from params.psmc_psmcfa_opts
-	val psmc_opts from params.psmc_opts
-	val psmc_bootstrap from params.psmc_bootstrap
-	val psmc_plot_opts from params.psmc_plot_opts
+	path final_bam
+	path genome
+	path "*"
+	val psmc_mpileup_opts
+	val psmc_vcfutils_opts
+	val psmc_psmcfa_opts
+	val psmc_opts
+	val psmc_bootstrap
+	val psmc_plot_opts
 	
 	output:
 	path "${final_bam.simpleName}.fq.gz"
@@ -423,6 +397,8 @@ process runPSMC {
 	"""
 
 }
+
+
 workflow.onComplete {
 	if (workflow.success) {
 		println "Elephant pipeline completed successfully at $workflow.complete!"
@@ -436,3 +412,73 @@ workflow.onComplete {
 		}
 	}
 }
+
+workflow merge_samples {
+	// Left-align indels of merged data
+	take:
+		samples
+		marker
+		refseq
+		refseq_files
+	main:
+		mergeSampleBAM(samples, marker)
+		leftAlignIndels(mergeSampleBAM.out.bam, mergeSampleBAM.out.sample, refseq, refseq_files) 
+		mergedMarkDup(leftAlignIndels.out, marker)
+	emit:
+		mergedMarkDup.out
+}
+
+workflow mapqStats {
+	// Alias of mergedStats for MapQ-filtered data
+	take:
+		bam
+	main:
+		mergedStats(bam, "mapq")
+	emit:
+		mergedStats.out
+}
+
+workflow mtDNA_processing {
+	// Left-align indels, merge and mark duplicates for mtDNA BAMs.
+	take:
+		alignments
+		sample
+		library
+		rg
+	main:
+		prepareMitoRef(params.mtDNA, params.mtDNA_ID)
+		alignMitoSeqs(alignments, sample, library, rg, params.mtDNA, prepareMitoRef.out)
+		leftAlignIndels(alignMitoSeqs.out.bam, alignMitoSeqs.out.sample, params.mtDNA, prepareMitoRef.out) | markDuplicates
+		flagStats(markDuplicates.out, params.min_uniq_mapped)
+		merge_samples(flagStats.out.bam.groupTuple(by: 1), "mt", params.mtDNA, prepareMitoRef.out)
+		mergedStats(merge_samples.out, "markdup")
+		filterMapQ(merge_samples.out, params.mapq) 
+		mapqStats(filterMapQ.out)
+		if (params.gatk) { callMtVariants(filterMapQ.out, params.mtDNA, prepareMitoRef.out) }
+	emit:
+		merge_samples.out
+		
+}
+
+workflow {
+	main:
+		prepareRef(params.refseq)
+		if (params.read_trimming) {
+			read_data = Channel.fromPath(params.samples).splitCsv(header:true).map { row -> tuple(row.Sample, row.Library, file(params.reads + row.Read1), file(params.reads + row.Read2), '@RG\\tID:' + row.Library + '\\tSM:' + row.Sample + '\\tLB:ILLUMINA\\tPL:ILLUMINA', row.Adapter1, row.Adapter2)}
+			trimReads(read_data, params.trimparams)
+			alignSeqs(trimReads.out, params.refseq, prepareRef.out)
+		} else {
+			read_data = Channel.fromPath(params.samples).splitCsv(header:true).map { row -> tuple(row.Sample, row.Library, file(params.reads + row.Read1), file(params.reads + row.Read2), '@RG\\tID:' + row.Library + '\\tSM:' + row.Sample + '\\tLB:ILLUMINA\\tPL:ILLUMINA')}
+			alignSeqs(read_data, params.refseq, prepareRef.out)
+		}
+		if (params.circular_mtDNA) { mtDNA_processing(alignSeqs.out.bam, alignSeqs.out.sample, alignSeqs.out.library, alignSeqs.out.rg) } 
+		leftAlignIndels(alignSeqs.out.bam, alignSeqs.out.sample, params.refseq, prepareRef.out) | markDuplicates
+		flagStats(markDuplicates.out, params.min_uniq_mapped)
+		merge_samples(flagStats.out.bam.groupTuple(by: 1), "genome", params.refseq, prepareRef.out)
+		mergedStats(merge_samples.out, "markdup")
+		filterMapQ(merge_samples.out, params.mapq)
+		mapqStats(filterMapQ.out)
+		if (params.gatk) { callGenomeVariants(filterMapQ.out, params.refseq, prepareRef.out) }
+		if (params.psmc) { runPSMC(filterMapQ.out, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
+}
+	
