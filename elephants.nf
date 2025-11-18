@@ -270,7 +270,11 @@ process mergedStats {
 	// Calculate alignment statistics using SAMtools flagstat
 	
 	publishDir "$params.outdir/04_MergedStats", mode: 'copy', pattern: "*.markdup.stats.txt"
+	publishDir "$params.outdir/04_MergedStats", mode: 'copy', pattern: "*.markdup.depth.txt"
+	publishDir "$params.outdir/04_MergedStats", mode: 'copy', pattern: "*.markdup.coverage.txt"
 	publishDir "$params.outdir/06_MapQStats", mode: 'copy', pattern: "*.mapq.stats.txt"
+	publishDir "$params.outdir/06_MapQStats", mode: 'copy', pattern: "*.mapq.depth.txt"
+	publishDir "$params.outdir/06_MapQStats", mode: 'copy', pattern: "*.mapq.coverage.txt"
 	
 	input:
 	path mrkdupbam
