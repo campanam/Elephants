@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-/* Elephant Analysis Pipeline version 0.3.0
+/* Elephant Analysis Pipeline version 0.3.1
 Michael G. Campana, 2023-2025
 Smithsonian\'s National Zoo and Conservation Biology Institute
 
@@ -293,7 +293,7 @@ process filterMapQ {
 
 	// Filter by minimum MapQ
 	
-	publishDir "$params.outdir/04_MergedFlagStats", mode: 'copy'
+	publishDir "$params.outdir/05_MapQBAMs", mode: 'copy'
 	
 	input:
 	path mrkdupbam
