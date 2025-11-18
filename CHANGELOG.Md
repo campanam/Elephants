@@ -3,6 +3,10 @@
 Michael G. Campana, 2023-2025  
 Smithsonian's National Zoo and Conservation Biology Institute  
 
+# Version 0.3.1  
+Corrected output directory name for MapQ-filtered BAMs  
+Updated configuration profile  
+
 ### Version 0.3.0  
 Conversion to DSL2  
 Option to perform circular mitochondrial alignment  
