@@ -5,6 +5,7 @@ Smithsonian's National Zoo and Conservation Biology Institute
 
 # Version 0.3.1  
 Corrected output directory name for MapQ-filtered BAMs  
+Corrected statistics output for mergedStats  
 Updated configuration profile  
 
 ### Version 0.3.0  
