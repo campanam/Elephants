@@ -3,6 +3,10 @@
 Michael G. Campana, 2023-2025  
 Smithsonian's National Zoo and Conservation Biology Institute  
 
+# Version 0.3.2  
+Corrected output directory name for gVCF and PSMC results  
+Removed obsolete '03_FinalBAMs' output directory  
+
 # Version 0.3.1  
 Corrected output directory name for MapQ-filtered BAMs  
 Corrected statistics output for mergedStats  

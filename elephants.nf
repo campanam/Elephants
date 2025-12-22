@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-/* Elephant Analysis Pipeline version 0.3.1
+/* Elephant Analysis Pipeline version 0.3.2
 Michael G. Campana, 2023-2025
 Smithsonian\'s National Zoo and Conservation Biology Institute
 
@@ -207,8 +207,6 @@ process mergeSampleBAM {
 
 	// Merge libraries by their sample IDs using SAMtools merge
 	
-	publishDir "$params.outdir/03_FinalBAMs", mode: 'copy', pattern: "*_merged_vs_*.markdup.bam"
-	
 	input:
 	tuple path(bam), val(sample)
 	val(marker)
@@ -237,7 +235,7 @@ process mergeSampleBAM {
 
 process mergedMarkDup {
 
-	// Mark duplicates for merged libraries after merging using Picard MarkDuplicates
+	// Mark duplicates for merged libraries
 	
 	publishDir "$params.outdir/03_MergedBAMs", mode: 'copy'
 	
@@ -323,7 +321,7 @@ process callMtVariants {
 
 	// Call mtDNA variants using GATK HaplotypeCaller
 	
-	publishDir "$params.outdir/06_IndividualgVCFs/mt", mode: 'copy'
+	publishDir "$params.outdir/07_IndividualgVCFs/mt", mode: 'copy'
 	
 	input:
 	path final_bam
@@ -345,7 +343,7 @@ process callGenomeVariants {
 
 	// Call nuclear genome variants using GATK HaplotypeCaller
 	
-	publishDir "$params.outdir/06_IndividualgVCFs/genome", mode: 'copy'
+	publishDir "$params.outdir/07_IndividualgVCFs/genome", mode: 'copy'
 	
 	input:
 	path final_bam
@@ -367,7 +365,7 @@ process runPSMC {
 
 	// Generate consensus sequence and run PSMC
 	
-	publishDir "$params.outdir/07_PSMC", mode: 'copy'
+	publishDir "$params.outdir/08_PSMC", mode: 'copy'
 	
 	input:
 	path final_bam
