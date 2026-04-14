@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 
-/* Elephant Analysis Pipeline version 0.3.2
-Michael G. Campana, 2023-2025
+/* Elephant Analysis Pipeline version 0.3.3
+Michael G. Campana, 2023-2026
 Smithsonian\'s National Zoo and Conservation Biology Institute
 
 The software is made available under the Smithsonian Institution terms of use (https://www.si.edu/termsofuse). */
@@ -52,6 +52,8 @@ process prepareMitoRef {
 process trimReads {
 
 	// Trim reads using AdapterRemoval v2
+	
+	publishDir "$params.outdir/00_TrimmedReads", mode: 'copy', enabled: "$params.keep_trimmed_reads"
 	
 	input:
 	tuple val(sample), val(library), path(reads1), path(reads2), val(rg), val(adapter1), val(adapter2)

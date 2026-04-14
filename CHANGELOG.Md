@@ -1,7 +1,10 @@
 # Elephant Analysis Pipeline CHANGELOG  
 
-Michael G. Campana, 2023-2025  
+Michael G. Campana, 2023-2026  
 Smithsonian's National Zoo and Conservation Biology Institute  
+
+# Version 0.3.3  
+Added option to retain trimmed reads in FASTQ format  
 
 # Version 0.3.2  
 Corrected output directory name for gVCF and PSMC results  

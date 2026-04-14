@@ -28,6 +28,7 @@ The `nextflow.config` file included with this repository contains a standard pro
 `samples`: Path to the CSV detailing sequencing libraries (See below)  
 `reads`: Path to the folder containing the FASTQ read pairs  
 `read_trimming`: Trim reads using AdapterRemoval v2 (true or false)  
+`keep_trimmed_reads`: Retain trimmed/merged reads in fastq format (true or false)  
 `trimparams`: Parameters for read-trimming. This pipeline expects paired-read input, so do not collapse reads.  
 `min_uniq_mapped`: Minimum number of unique mapped reads to retain an alignment file  
 `java_options`: String of options for Java executables.  
