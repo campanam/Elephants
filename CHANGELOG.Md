@@ -3,6 +3,10 @@
 Michael G. Campana, 2023-2026  
 Smithsonian's National Zoo and Conservation Biology Institute  
 
+# Version 0.4.0  
+Input CSV now specifies LB and PL tags read-group tags  
+Handling for duplicate-marking using LB tags  
+
 # Version 0.3.3  
 Added option to retain trimmed reads in FASTQ format  
 

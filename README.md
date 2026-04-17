@@ -1,7 +1,7 @@
 # Elephant Analysis Pipeline  
 <img align="right" src="NZP-20180628-596SB_thumb.jpg">  
 
-Michael G. Campana, 2023-2025  
+Michael G. Campana, 2023-2026  
 Smithsonian's National Zoo & Conservation Biology Institute  
 
 This Nextflow [1] pipeline automates the alignment of Illumina sequencing reads against a reference genome and mitogenome using BWA-MEM [2], SAMtools [3-4], and the Genome Analysis Toolkit [5]. It optionally performs PSMC analysis [6], read trimming using AdapterRemoval v2 [7] and circular mitogenome alignment using CircularMapper [8].  
@@ -46,9 +46,9 @@ The `nextflow.config` file included with this repository contains a standard pro
 
 ## Sample CSV File  
 The pipeline expects a headered CSV file listing samples and libraries with the following columns:  
-`Sample,Library,Read1,Read2,Adapter1,Adapter2`  
+`Sample,RG,Library,PL,Read1,Read2,Adapter1,Adapter2`  
 
-`Sample` is the name of the sample, while `Library` is in the individual library identification (in case a sample was sequenced more than once). `Read1` and `Read2` give the forward and reverse read file names. `Adapter1` and `Adapter2` give the expected forward and reverse adapter sequences.  
+`Sample` is the name of the sample. `RG` is the unique read-group identification for each set of sequence reads for an individual. `Library` is in the individual library identification (in case a library was sequenced more than once). `PL` is the platform identifier (ILLUMINA, SOLID, LS454, HELICOS or PACBIO). `Read1` and `Read2` give the forward and reverse read file names. `Adapter1` and `Adapter2` give the expected forward and reverse adapter sequences.  
 
 *NB: The adapter columns can be omitted if no read-trimming will be performed.*  
 
