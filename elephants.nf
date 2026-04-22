@@ -488,7 +488,7 @@ workflow {
 			alignSeqs(read_data, params.refseq, prepareRef.out)
 		}
 		if (params.circular_mtDNA) { mtDNA_processing(alignSeqs.out.bam, alignSeqs.out.sample, alignSeqs.out.library, alignSeqs.out.rg) } 
-		leftAlignIndels(alignSeqs.out.bam, alignSeqs.out.sample, params.refseq, prepareRef.out) | markDuplicates
+		leftAlignIndels(alignSeqs.out.bam, alignSeqs.out.sample, 2, params.refseq, prepareRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		merge_samples(flagStats.out.bam.groupTuple(by: 1), "genome", params.refseq, prepareRef.out)
 		mergedStats(merge_samples.out, "markdup")
