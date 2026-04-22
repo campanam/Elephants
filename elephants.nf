@@ -181,13 +181,15 @@ process flagStats {
 	// Calculate alignment statistics for unmerged library files using SAMtools
 	
 	publishDir "$params.outdir/02_LibraryStats", mode: 'copy', pattern: '*.stats.txt'
+	publishDir "$params.outdir/02_LibraryStats", mode: 'copy', pattern: '*.depth.txt.gz'
+	publishDir "$params.outdir/02_LibraryStats", mode: 'copy', pattern: '*.coverage.txt'
 	
 	input:
 	tuple path(mrkdupbam), val(sample)
 	val(minmapped)
 	
 	output:
-	path("${mrkdupbam.simpleName}.*.txt")
+	path("${mrkdupbam.simpleName}.*.txt*")
 	tuple path("${mrkdupbam.simpleName}.ok.bam"), val(sample), optional: true, emit: bam
 	
 	script:
@@ -195,7 +197,7 @@ process flagStats {
 	"""
 	#!/usr/bin/env bash
 	samtools flagstat -@ ${samtools_extra_threads} ${mrkdupbam} > ${mrkdupbam.simpleName}.stats.txt
-	samtools depth -@ ${samtools_extra_threads} $mrkdupbam > ${mrkdupbam.simpleName}.depth.txt
+	samtools depth -@ ${samtools_extra_threads} $mrkdupbam | gzip > ${mrkdupbam.simpleName}.depth.txt.gz
 	samtools coverage $mrkdupbam > ${mrkdupbam.simpleName}.coverage.txt
 	primary=`sed -n \'8p\' ${mrkdupbam.simpleName}.stats.txt | cut -f 1 -d \" \"` # Primary alignments
 	dup=`sed -n \'6p\' ${mrkdupbam.simpleName}.stats.txt | cut -f 1 -d \" \"` # Primary duplicates
@@ -270,10 +272,10 @@ process mergedStats {
 	// Calculate alignment statistics using SAMtools flagstat
 	
 	publishDir "$params.outdir/04_MergedStats", mode: 'copy', pattern: "*.markdup.stats.txt"
-	publishDir "$params.outdir/04_MergedStats", mode: 'copy', pattern: "*.markdup.depth.txt"
+	publishDir "$params.outdir/04_MergedStats", mode: 'copy', pattern: "*.markdup.depth.txt.gz"
 	publishDir "$params.outdir/04_MergedStats", mode: 'copy', pattern: "*.markdup.coverage.txt"
 	publishDir "$params.outdir/06_MapQStats", mode: 'copy', pattern: "*.mapq.stats.txt"
-	publishDir "$params.outdir/06_MapQStats", mode: 'copy', pattern: "*.mapq.depth.txt"
+	publishDir "$params.outdir/06_MapQStats", mode: 'copy', pattern: "*.mapq.depth.txt.gz"
 	publishDir "$params.outdir/06_MapQStats", mode: 'copy', pattern: "*.mapq.coverage.txt"
 	
 	input:
@@ -281,13 +283,13 @@ process mergedStats {
 	val extension
 	
 	output:
-	path "${mrkdupbam.simpleName}.${extension}.*.txt"
+	path "${mrkdupbam.simpleName}.${extension}.*.txt*"
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
 	"""
 	samtools flagstat -@ ${samtools_extra_threads} ${mrkdupbam} > ${mrkdupbam.simpleName}.${extension}.stats.txt
-	samtools depth -@ ${samtools_extra_threads} $mrkdupbam > ${mrkdupbam.simpleName}.${extension}.depth.txt
+	samtools depth -@ ${samtools_extra_threads} $mrkdupbam | gzip > ${mrkdupbam.simpleName}.${extension}.depth.txt.gz
 	samtools coverage $mrkdupbam > ${mrkdupbam.simpleName}.${extension}.coverage.txt
 	"""
 

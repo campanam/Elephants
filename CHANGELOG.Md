@@ -6,6 +6,8 @@ Smithsonian's National Zoo and Conservation Biology Institute
 # Version 0.4.0  
 Input CSV now specifies LB and PL tags read-group tags  
 Handling for duplicate-marking using LB tags  
+Per-site depth stats are now gzipped  
+Per-library depth and coverage stats are now exported to output  
 
 # Version 0.3.3  
 Added option to retain trimmed reads in FASTQ format  
