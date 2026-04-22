@@ -128,6 +128,7 @@ process leftAlignIndels {
 	input:
 	path(rg_bam)
 	val(sample)
+	val(bams)
 	path refseq
 	path "*"
 	
@@ -135,6 +136,10 @@ process leftAlignIndels {
 	tuple path("${rg_bam.simpleName}.realn.bam"), val(sample)
 	
 	script:
+	if ( bams == 1 ) // Skip realignment for merged samples. Individual library alignments sets bams to 2 to ignore bypass.
+		"""
+		ln -s $rg_bam ${$rg_bam.simpleName}.realn.bam
+		"""
 	if ( params.csi )
 		"""
 		samtools index -c ${rg_bam}
@@ -218,6 +223,7 @@ process mergeSampleBAM {
 	output:
 	path "${sample}_vs_${marker}_merged.bam", emit: bam
 	val(sample), emit: sample
+	val(bams), emit: bams
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
@@ -244,15 +250,19 @@ process mergedMarkDup {
 	publishDir "$params.outdir/03_MergedBAMs", mode: 'copy'
 	
 	input:
-	tuple path(lalnbam), val(sample)
+	tuple path(lalnbam), val(sample), val(bams)
 	val(marker)
 	
 	output:
-	path "${sample}_vs_${marker}_merged.markdup.bam"
+	tuple path("${sample}_vs_${marker}_merged.markdup.bam"), val(bams)
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
-	if ( params.markDuplicates == "sambamba" )
+	if ( bams == 1 )  // Skip re-markduplicates
+		"""
+		ln -s ${lalnbam} ${lalnbam.simpleName}.markdup.bam
+		"""
+	else if ( params.markDuplicates == "sambamba" )
 		"""
 		sambamba markdup ${lalnbam} ${lalnbam.simpleName}.markdup.bam
 		"""
@@ -428,7 +438,7 @@ workflow merge_samples {
 		refseq_files
 	main:
 		mergeSampleBAM(samples, marker)
-		leftAlignIndels(mergeSampleBAM.out.bam, mergeSampleBAM.out.sample, refseq, refseq_files) 
+		leftAlignIndels(mergeSampleBAM.out.bam, mergeSampleBAM.out.sample, mergeSampleBAM.out.bams, refseq, refseq_files) 
 		mergedMarkDup(leftAlignIndels.out, marker)
 	emit:
 		mergedMarkDup.out
@@ -454,7 +464,7 @@ workflow mtDNA_processing {
 	main:
 		prepareMitoRef(params.mtDNA, params.mtDNA_ID)
 		alignMitoSeqs(alignments, sample, library, rg, params.mtDNA, prepareMitoRef.out)
-		leftAlignIndels(alignMitoSeqs.out.bam, alignMitoSeqs.out.sample, params.mtDNA, prepareMitoRef.out) | markDuplicates
+		leftAlignIndels(alignMitoSeqs.out.bam, alignMitoSeqs.out.sample, 2, params.mtDNA, prepareMitoRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		merge_samples(flagStats.out.bam.groupTuple(by: 1), "mt", params.mtDNA, prepareMitoRef.out)
 		mergedStats(merge_samples.out, "markdup")
@@ -482,9 +492,14 @@ workflow {
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		merge_samples(flagStats.out.bam.groupTuple(by: 1), "genome", params.refseq, prepareRef.out)
 		mergedStats(merge_samples.out, "markdup")
-		filterMapQ(merge_samples.out, params.mapq)
-		mapqStats(filterMapQ.out)
-		if (params.gatk) { callGenomeVariants(filterMapQ.out, params.refseq, prepareRef.out) }
-		if (params.psmc) { runPSMC(filterMapQ.out, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
+		if (params.mapq > 0) {
+			filterMapQ(merge_samples.out, params.mapq)
+			mapqStats(filterMapQ.out)
+			if (params.gatk) { callGenomeVariants(filterMapQ.out, params.refseq, prepareRef.out) }
+			if (params.psmc) { runPSMC(filterMapQ.out, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
+		} else {
+			if (params.gatk) { callGenomeVariants(merge_samples.out, params.refseq, prepareRef.out) }
+			if (params.psmc) { runPSMC(merge_samples.out, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
+		}
 }
 	
