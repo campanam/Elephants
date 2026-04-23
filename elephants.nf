@@ -133,7 +133,7 @@ process leftAlignIndels {
 	path "*"
 	
 	output:
-	tuple path("${rg_bam.simpleName}.realn.bam"), val(bams)
+	tuple path("${rg_bam.simpleName}.realn.bam"), val(sample), val(bams)
 	
 	script:
 	if ( bams == 1 ) // Skip realignment for merged samples. Individual library alignments sets bams to 2 to ignore bypass.
@@ -159,7 +159,7 @@ process markDuplicates {
 	publishDir "$params.outdir/01_LibraryBAMs", mode: 'copy'
 	
 	input:
-	tuple path(lalnbam), val(sample)
+	tuple path(lalnbam), val(sample), val(bams) // bams is ignored here
 	
 	output:
 	tuple path("${lalnbam.simpleName}.markdup.bam"), val(sample)
