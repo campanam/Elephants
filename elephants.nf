@@ -254,7 +254,7 @@ process mergedMarkDup {
 	val(marker)
 	
 	output:
-	tuple path("${sample}_vs_${marker}_merged.markdup.bam"), val(bams)
+	path("${sample}_vs_${marker}_merged.markdup.bam")
 	
 	script:
 	samtools_extra_threads = task.cpus - 1
@@ -468,9 +468,13 @@ workflow mtDNA_processing {
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		merge_samples(flagStats.out.bam.groupTuple(by: 1), "mt", params.mtDNA, prepareMitoRef.out)
 		mergedStats(merge_samples.out, "markdup")
-		filterMapQ(merge_samples.out, params.mapq) 
-		mapqStats(filterMapQ.out)
-		if (params.gatk) { callMtVariants(filterMapQ.out, params.mtDNA, prepareMitoRef.out) }
+		if (params.mapq > 0) {
+			filterMapQ(merge_samples.out, params.mapq) 
+			mapqStats(filterMapQ.out)
+			if (params.gatk) { callMtVariants(filterMapQ.out, params.mtDNA, prepareMitoRef.out) }
+		} else {
+			if (params.gatk) { callMtVariants(merge_samples.out, params.mtDNA, prepareMitoRef.out) }
+		}
 	emit:
 		merge_samples.out
 		
@@ -491,15 +495,15 @@ workflow {
 		leftAlignIndels(alignSeqs.out.bam, alignSeqs.out.sample, 2, params.refseq, prepareRef.out) | markDuplicates
 		flagStats(markDuplicates.out, params.min_uniq_mapped)
 		merge_samples(flagStats.out.bam.groupTuple(by: 1), "genome", params.refseq, prepareRef.out)
-		mergedStats(merge_samples.mergedMarkDup.out, "markdup")
+		mergedStats(merge_samples.out, "markdup")
 		if (params.mapq > 0) {
-			filterMapQ(merge_samples.mergedMarkDup.out, params.mapq)
+			filterMapQ(merge_samples.out, params.mapq)
 			mapqStats(filterMapQ.out)
 			if (params.gatk) { callGenomeVariants(filterMapQ.out, params.refseq, prepareRef.out) }
 			if (params.psmc) { runPSMC(filterMapQ.out, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
 		} else {
-			if (params.gatk) { callGenomeVariants(merge_samples.mergedMarkDup.out, params.refseq, prepareRef.out) }
-			if (params.psmc) { runPSMC(merge_samples.mergedMarkDup.out, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
+			if (params.gatk) { callGenomeVariants(merge_samples.out, params.refseq, prepareRef.out) }
+			if (params.psmc) { runPSMC(merge_samples.out, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
 		}
 }
 	
