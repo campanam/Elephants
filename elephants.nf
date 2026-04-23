@@ -499,7 +499,7 @@ workflow {
 			if (params.psmc) { runPSMC(filterMapQ.out, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
 		} else {
 			if (params.gatk) { callGenomeVariants(merge_samples.mergedMarkDup.out, params.refseq, prepareRef.out) }
-			if (params.psmc) { runPSMC(merge_samples.out, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
+			if (params.psmc) { runPSMC(merge_samples.mergedMarkDup.out, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
 		}
 }
 	
