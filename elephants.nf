@@ -493,7 +493,7 @@ workflow {
 		merge_samples(flagStats.out.bam.groupTuple(by: 1), "genome", params.refseq, prepareRef.out)
 		mergedStats(merge_samples.mergedMarkDup.out, "markdup")
 		if (params.mapq > 0) {
-			filterMapQ(merge_samples.out, params.mapq)
+			filterMapQ(merge_samples.mergedMarkDup.out, params.mapq)
 			mapqStats(filterMapQ.out)
 			if (params.gatk) { callGenomeVariants(filterMapQ.out, params.refseq, prepareRef.out) }
 			if (params.psmc) { runPSMC(filterMapQ.out, params.refseq, prepareRef.out, params.psmc_mpileup_opts, params.psmc_vcfutils_opts, params.psmc_psmcfa_opts, params.psmc_opts, params.psmc_bootstrap, params.psmc_plot_opts) }
