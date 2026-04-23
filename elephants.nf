@@ -133,7 +133,7 @@ process leftAlignIndels {
 	path "*"
 	
 	output:
-	tuple path("${rg_bam.simpleName}.realn.bam"), val(sample)
+	tuple path("${rg_bam.simpleName}.realn.bam"), val(bams)
 	
 	script:
 	if ( bams == 1 ) // Skip realignment for merged samples. Individual library alignments sets bams to 2 to ignore bypass.
@@ -474,7 +474,7 @@ workflow mtDNA_processing {
 			if (params.gatk) { callMtVariants(filterMapQ.out, params.mtDNA, prepareMitoRef.out) }
 		} else {
 			if (params.gatk) { callMtVariants(merge_samples.out, params.mtDNA, prepareMitoRef.out) }
-		}
+		}qs
 	emit:
 		merge_samples.out
 		
