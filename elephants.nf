@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-/* Elephant Analysis Pipeline version 0.4.0
+/* Elephant Analysis Pipeline version 0.4.1
 Michael G. Campana, 2023-2026
 Smithsonian\'s National Zoo and Conservation Biology Institute
 
@@ -138,7 +138,7 @@ process leftAlignIndels {
 	script:
 	if ( bams == 1 ) // Skip realignment for merged samples. Individual library alignments sets bams to 2 to ignore bypass.
 		"""
-		ln -s $rg_bam ${$rg_bam.simpleName}.realn.bam
+		ln -s $rg_bam ${rg_bam.simpleName}.realn.bam
 		"""
 	if ( params.csi )
 		"""

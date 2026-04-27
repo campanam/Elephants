@@ -3,6 +3,9 @@
 Michael G. Campana, 2023-2026  
 Smithsonian's National Zoo and Conservation Biology Institute  
 
+# Version 0.4.1  
+$rg_bam bug fix  
+
 # Version 0.4.0  
 Input CSV now specifies LB and PL tags read-group tags  
 Handling for duplicate-marking using LB tags  
