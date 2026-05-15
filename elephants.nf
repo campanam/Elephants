@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-/* Elephant Analysis Pipeline version 0.4.1
+/* Elephant Analysis Pipeline version 0.4.2
 Michael G. Campana, 2023-2026
 Smithsonian\'s National Zoo and Conservation Biology Institute
 
@@ -41,7 +41,10 @@ process prepareMitoRef {
 	path "${mtDNA.baseName}*{_500.fasta,amb,ann,bwt,pac,sa,fai,dict,elongated}"
 	
 	"""
+	#!/usr/bin/env bash
+	if [ ! -f ${mtDNA.baseName}.fasta ]; then ln -s ${mtDNA} ${mtDNA.baseName}.fasta; fi
 	$circulargenerator -e 500 -i ${mtDNA} -s ${mtDNA_ID}
+	mv ${mtDNA.baseName}.fasta_500_elongated ${mtDNA}_500_elongated
 	bwa index ${mtDNA.baseName}_500.fasta
 	samtools faidx ${mtDNA}
 	samtools dict ${mtDNA} > ${mtDNA.baseName}.dict

@@ -3,6 +3,9 @@
 Michael G. Campana, 2023-2026  
 Smithsonian's National Zoo and Conservation Biology Institute  
 
+# Version 0.4.2  
+CircularMapper mtDNA file extension bug fix  
+
 # Version 0.4.1  
 $rg_bam bug fix  
 
